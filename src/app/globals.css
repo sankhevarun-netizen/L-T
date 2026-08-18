@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Neutral canvas / surface system */
+    --background: 210 40% 98%; /* slate-50 canvas */
+    --foreground: 222 47% 11%; /* slate-900 text */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* KPMG navy #00338D as the primary */
+    --primary: 220 100% 28%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%; /* slate-500 */
+
+    --accent: 199 100% 43%; /* kpmg light blue */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%; /* slate-200 */
+    --input: 214 32% 91%;
+    --ring: 210 100% 36%; /* kpmg blue focus ring */
+
+    --radius: 0.75rem;
+
+    /* Brand tokens exposed as raw CSS variables for gradients/SVG */
+    --kpmg-navy: #00338d;
+    --kpmg-blue: #005eb8;
+    --kpmg-lightblue: #0091da;
+    --kpmg-purple: #6d2077;
+    --kpmg-violet: #483698;
+    --kpmg-teal: #00a3a1;
+    --kpmg-magenta: #c6007e;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  /*
+   * Tabular figures ONLY where numbers align vertically — table columns and
+   * axis ticks. Large standalone values (KPI/hero figures) keep the font's
+   * proportional figures; equal-width digits make them look loose at display size.
+   */
+  .nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* The standard surface used by every panel in the console */
+  .surface {
+    @apply rounded-xl border border-slate-200 bg-white shadow-card;
+  }
+
+  .section-title {
+    @apply text-[15px] font-semibold tracking-[-0.01em] text-slate-900;
+  }
+
+  .muted-label {
+    @apply text-xs font-medium uppercase tracking-wider text-slate-500;
+  }
+}
+
+@layer utilities {
+  /* Thin, unobtrusive scrollbars for the dark rail and inner panels */
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(148 163 184 / 0.45) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: rgb(148 163 184 / 0.45);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .rail-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+  }
+
+  .rail-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .rail-scroll::-webkit-scrollbar-thumb {
+    background-color: rgb(255 255 255 / 0.18);
+    border-radius: 9999px;
+  }
+}

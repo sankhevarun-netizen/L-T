@@ -1,0 +1,206 @@
+import type { SeedCampaign } from '@/data/reference'
+import type { AIService } from '@/lib/ai'
+import type {
+  Booking,
+  Engagement,
+  Lead,
+  Payment,
+  ServiceTicket,
+  Severity,
+  SfActivity,
+  SfTask,
+  SiteVisit,
+} from '@/types'
+
+/**
+ * KPMG AI archetype framework. Every agent declares which archetype it is an
+ * instance of, which is how the gallery groups them and how the platform page
+ * maps capability to business value.
+ */
+export type AgentArchetype =
+  | 'pattern-identifier'
+  | 'predictive-algorithm'
+  | 'content-generator'
+  | 'information-extractor'
+  | 'digital-assistant'
+  | 'language-translator'
+  | 'code-generator'
+
+export type AgentPriority = 'High' | 'Medium' | 'Low'
+
+export const ARCHETYPE_META: Record<
+  AgentArchetype,
+  { label: string; blurb: string; priority: AgentPriority; accent: string }
+> = {
+  'pattern-identifier': {
+    label: 'Pattern Identifiers',
+    blurb: 'Spot signals and anomalies across large volumes of interactions.',
+    priority: 'High',
+    accent: 'text-kpmg-navy',
+  },
+  'predictive-algorithm': {
+    label: 'Predictive Algorithms',
+    blurb: 'Score likelihood and forecast outcomes from historical behaviour.',
+    priority: 'High',
+    accent: 'text-kpmg-blue',
+  },
+  'information-extractor': {
+    label: 'Information Extractors',
+    blurb: 'Pull structured facts out of unstructured conversations.',
+    priority: 'High',
+    accent: 'text-kpmg-teal',
+  },
+  'digital-assistant': {
+    label: 'Digital Assistants',
+    blurb: 'Take the routine follow-through off the team’s plate.',
+    priority: 'High',
+    accent: 'text-kpmg-violet',
+  },
+  'content-generator': {
+    label: 'Content Generators',
+    blurb: 'Draft the outbound message, summary or plan.',
+    priority: 'Medium',
+    accent: 'text-kpmg-purple',
+  },
+  'language-translator': {
+    label: 'Language Translators',
+    blurb: 'Bridge language and channel between customer and team.',
+    priority: 'Medium',
+    accent: 'text-kpmg-magenta',
+  },
+  'code-generator': {
+    label: 'Code Generators',
+    blurb: 'Generate integration and automation logic.',
+    priority: 'Low',
+    accent: 'text-slate-500',
+  },
+}
+
+/* ------------------------------------------------------------------ */
+/* Everything an agent can see                                         */
+/* ------------------------------------------------------------------ */
+
+export interface AgentContext {
+  leads: Lead[]
+  engagements: Engagement[]
+  siteVisits: SiteVisit[]
+  bookings: Booking[]
+  payments: Payment[]
+  serviceTickets: ServiceTicket[]
+  tasks: SfTask[]
+  campaigns: SeedCampaign[]
+  ingestedLeadIds: string[]
+  ai: AIService
+}
+
+/* ------------------------------------------------------------------ */
+/* What an agent produces                                              */
+/* ------------------------------------------------------------------ */
+
+export interface AgentFinding {
+  id: string
+  leadId?: string
+  subjectName: string
+  headline: string
+  detail: string
+  severity: Severity
+  /** The specific records/behaviour that justified the finding. */
+  evidence: string[]
+  impactCr?: number
+}
+
+/**
+ * A write the agent wants to make against the simulated Salesforce org.
+ * Modelled as data rather than a closure so a plan can be inspected, shown in
+ * the UI and replayed before anything is committed.
+ */
+export type CrmWrite =
+  | {
+      kind: 'flag-lead'
+      leadId: string
+      flags: Partial<
+        Pick<Lead, 'intent' | 'cold' | 'dnd' | 'crmStatus' | 'evidenceStatus'>
+      >
+      reason: string
+    }
+  | {
+      kind: 'create-task'
+      leadId: string
+      subject: string
+      ownerId: string
+      dueInDays: number
+      priority: SfTask['priority']
+    }
+  | {
+      kind: 'log-activity'
+      object: SfActivity['object']
+      recordId: string
+      recordName: string
+      action: string
+      detail: string
+    }
+  | { kind: 'suppress-campaign'; campaignId: string; reason: string }
+  | { kind: 'ingest-sanitized'; leadIds: string[] }
+  | {
+      kind: 'update-lead'
+      leadId: string
+      patch: Partial<Lead>
+      action: string
+      detail: string
+    }
+
+export interface AgentActionPlan {
+  id: string
+  agentId: string
+  findingId: string
+  leadId?: string
+  label: string
+  reason: string
+  /** Plain-language description of the CRM effect, shown before executing. */
+  crmEffect: string
+  write: CrmWrite
+  status: 'suggested' | 'executed'
+}
+
+export interface AgentRunResult {
+  agentId: string
+  findings: AgentFinding[]
+  actions: AgentActionPlan[]
+  /** One-line narrative from the AI service. */
+  summary: string
+  /** Findings beyond those returned, for the "and N more" line. */
+  totalFindings: number
+  ranAt: string
+}
+
+/* ------------------------------------------------------------------ */
+/* The agent contract                                                  */
+/* ------------------------------------------------------------------ */
+
+export interface Agent {
+  id: string
+  name: string
+  archetype: AgentArchetype
+  priority: AgentPriority
+  description: string
+
+  /** The four columns the gallery card shows. */
+  scenario: string
+  currentIssue: string
+  aiSolution: string
+  crmAction: string
+
+  /**
+   * Pure rule pass — no AI call, no awaiting. The Overview widgets read this
+   * directly so the dashboard paints instantly; `detect` layers the AI
+   * narrative on top of the same rules for the gallery.
+   */
+  detectSync(ctx: AgentContext): AgentFinding[]
+
+  detect(ctx: AgentContext): Promise<AgentFinding[]>
+
+  recommendAction(
+    findings: AgentFinding[],
+    ctx: AgentContext,
+  ): Promise<AgentActionPlan[]>
+}
