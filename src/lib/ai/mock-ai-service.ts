@@ -1,7 +1,10 @@
+import { THEME_DEFS, THEME_DEFS_BY_ID } from '@/data/feedback'
 import type {
   AICoachingInput,
   AICoachingResult,
   AIDraftInput,
+  AIRootCauseInput,
+  AIRootCauseResult,
   AIDraftResult,
   AICompletionRequest,
   AICompletionResult,
@@ -9,6 +12,7 @@ import type {
   AIService,
   AISentimentResult,
   AISummaryResult,
+  AIThemeExtraction,
 } from './types'
 
 /**
@@ -397,6 +401,79 @@ export class MockAIService implements AIService {
       subject: input.channel === 'email' ? subjects[input.purpose] : undefined,
       body: `${openers[input.channel]} ${bodies[input.purpose]}${closers[input.channel]}`,
       channel: input.channel,
+    }
+  }
+
+  /**
+   * Deterministic theme extraction.
+   *
+   * Matches the same taxonomy the selectors use, so the mock and the rule pass
+   * never disagree on stage. Evidence is copied from the supplied text rather
+   * than written, because a fabricated quote is the one failure mode this
+   * feature cannot survive.
+   */
+  async extractThemes(
+    verbatims: string[],
+    context?: Record<string, unknown>,
+  ): Promise<AIThemeExtraction> {
+    await delay(verbatims.join('|').slice(0, 120), 220, 560)
+
+    const acc = new Map<string, { evidence: string[]; negative: number; total: number }>()
+
+    for (const verbatim of verbatims) {
+      const text = verbatim.toLowerCase()
+      for (const def of THEME_DEFS) {
+        if (def.excludes?.some((phrase) => text.includes(phrase))) continue
+        if (!def.keywords.some((keyword) => text.includes(keyword))) continue
+
+        const entry = acc.get(def.id) ?? { evidence: [], negative: 0, total: 0 }
+        entry.total += 1
+        if (/not|no |delay|never|still|chas|wrong|poor/.test(text)) entry.negative += 1
+        if (entry.evidence.length < 3) entry.evidence.push(verbatim)
+        acc.set(def.id, entry)
+      }
+    }
+
+    const themes = [...acc.entries()]
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([id, entry]) => {
+        const def = THEME_DEFS_BY_ID[id]
+        const negativeShare = entry.total ? entry.negative / entry.total : 0
+        return {
+          label: def.label,
+          aspect: def.aspect,
+          sentiment:
+            negativeShare > 0.5
+              ? ('negative' as const)
+              : negativeShare > 0.2
+                ? ('neutral' as const)
+                : ('positive' as const),
+          confidence: Math.min(92, 40 + entry.total * 4),
+          evidence: entry.evidence,
+        }
+      })
+
+    void context
+    return {
+      themes,
+      summary: themes.length
+        ? `${themes.length} theme(s) across ${verbatims.length} response(s); ${themes[0].label} is the most frequent.`
+        : 'No recognised theme in this batch.',
+    }
+  }
+
+  async explainRootCause(input: AIRootCauseInput): Promise<AIRootCauseResult> {
+    await delay(`${input.theme}:${input.journeyStage}`, 200, 520)
+
+    return {
+      // Phrased as a hypothesis on purpose: the number is an association.
+      hypothesis: `Feedback about ${input.theme.toLowerCase()} concentrates at the ${input.journeyStage} stage on the ${input.touchpoint.toLowerCase()} touchpoint, where it coincides with an NPS drag of ${input.npsDrag} across ${input.affectedResponses} responses. A process gap at that handoff is the most plausible explanation, but this is association rather than an established cause.`,
+      correlates: [
+        `Whether ${input.touchpoint.toLowerCase()} turnaround times moved in the same period`,
+        'Whether the affected responses concentrate in specific projects or teams',
+        'Whether an operational change preceded the shift',
+      ],
+      confidence: Math.round(Math.min(88, 45 + Math.abs(input.correlation) * 50)),
     }
   }
 }

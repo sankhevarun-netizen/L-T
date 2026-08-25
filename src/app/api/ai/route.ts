@@ -22,6 +22,8 @@ type Task =
   | 'next-best-action'
   | 'coaching'
   | 'draft'
+  | 'voc-themes'
+  | 'root-cause'
 
 interface TaskSpec {
   system: string
@@ -120,6 +122,67 @@ const TASKS: Record<Task, TaskSpec> = {
         body: { type: 'string' },
       },
       required: ['subject', 'body'],
+      additionalProperties: false,
+    },
+  },
+
+  'voc-themes': {
+    system:
+      'You analyse open-text customer feedback for a real-estate developer. Group comments into themes by aspect. Every theme must quote spans from the supplied text verbatim — never paraphrase, never invent a quote. Confidence reflects how much text supports the theme.',
+    schema: {
+      type: 'object',
+      properties: {
+        themes: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              label: { type: 'string' },
+              aspect: {
+                type: 'string',
+                description:
+                  'One of Documentation, Service, Handover, Payment, Quality, Sales, Amenities, Allotment.',
+              },
+              sentiment: {
+                type: 'string',
+                enum: ['positive', 'neutral', 'negative'],
+              },
+              confidence: { type: 'number' },
+              evidence: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Exact spans copied from the supplied text.',
+              },
+            },
+            required: ['label', 'aspect', 'sentiment', 'confidence', 'evidence'],
+            additionalProperties: false,
+          },
+        },
+        summary: { type: 'string' },
+      },
+      required: ['themes', 'summary'],
+      additionalProperties: false,
+    },
+  },
+
+  'root-cause': {
+    system:
+      'You explain why a group of customers gave low satisfaction scores. State a hypothesis, never a proven cause: the data shows association, not causation. Name what would have to be checked in the business to confirm it.',
+    schema: {
+      type: 'object',
+      properties: {
+        hypothesis: {
+          type: 'string',
+          description: 'One or two sentences, phrased as a hypothesis.',
+        },
+        correlates: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'What would need validating before treating this as a cause.',
+        },
+        confidence: { type: 'number' },
+      },
+      required: ['hypothesis', 'correlates', 'confidence'],
       additionalProperties: false,
     },
   },

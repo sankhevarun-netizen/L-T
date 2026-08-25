@@ -1,8 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   ChartColumn,
+  ChevronRight,
+  Gauge,
   Download,
   FileText,
   ShieldAlert,
@@ -17,12 +20,24 @@ import { riskDigest, useAgentContext } from '@/lib/agents'
 import { selectCampaignRows, isAtRisk, weightedValueCr } from '@/lib/selectors/overview'
 import { selectPipelineTotals, selectStageMetrics } from '@/lib/selectors/pipeline'
 import { selectRepStats } from '@/lib/selectors/team'
+import {
+  selectCsatByTouchpoint,
+  selectNpsSummary,
+  selectRecoverySummary,
+  selectRootCauseClusters,
+  selectThemes,
+} from '@/lib/selectors/feedback'
 import { useCrmStore } from '@/store/crm-store'
 import { DEMO_NOW } from '@/data/reference'
 import { formatCrore, formatNumber, formatPercentValue } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-type ReportId = 'pipeline-truth' | 'campaign-roi' | 'lead-quality' | 'at-risk'
+type ReportId =
+  | 'pipeline-truth'
+  | 'campaign-roi'
+  | 'lead-quality'
+  | 'at-risk'
+  | 'customer-feedback'
 
 interface ReportSection {
   heading: string
@@ -81,11 +96,22 @@ const REPORTS: ReportDef[] = [
     accent: 'text-status-danger',
     accentBg: 'bg-status-danger/10',
   },
+  {
+    id: 'customer-feedback',
+    name: 'Customer Feedback',
+    description:
+      'NPS and CSAT across the journey, with the themes dragging the score and the recovery still open.',
+    icon: Gauge,
+    accent: 'text-kpmg-teal',
+    accentBg: 'bg-kpmg-teal/10',
+  },
 ]
 
 export function ReportsGallery() {
   const ctx = useAgentContext()
   const bookings = useCrmStore((s) => s.bookings)
+  const surveyResponses = useCrmStore((s) => s.surveyResponses)
+  const recoveryCases = useCrmStore((s) => s.recoveryCases)
   const [selected, setSelected] = useState<ReportId>('pipeline-truth')
 
   const sections = useMemo<ReportSection[]>(() => {
@@ -131,6 +157,62 @@ export function ReportsGallery() {
               formatNumber(s.stalledCount),
             ],
             danger: s.stalledCount > s.count * 0.25,
+          })),
+        },
+      ]
+    }
+
+    if (selected === 'customer-feedback') {
+      const nps = selectNpsSummary(surveyResponses)
+      const touchpoints = selectCsatByTouchpoint(surveyResponses)
+      const themes = selectThemes(surveyResponses)
+      const clusters = selectRootCauseClusters(surveyResponses, themes)
+      const recovery = selectRecoverySummary(surveyResponses, recoveryCases)
+      const maxDrag = Math.max(...clusters.map((c) => Math.abs(c.npsDrag)), 1)
+
+      return [
+        {
+          heading: 'Headline',
+          figures: [
+            { label: 'NPS', value: `${nps.nps > 0 ? '+' : ''}${nps.nps}` },
+            { label: 'Responses', value: formatNumber(nps.responses) },
+            {
+              label: 'Detractors',
+              value: formatPercentValue(nps.detractorPct),
+              danger: true,
+            },
+            {
+              label: 'Recovery closure',
+              value: formatPercentValue(recovery.closureRatePct),
+            },
+            {
+              label: 'Breaching SLA',
+              value: formatNumber(recovery.breaching),
+              danger: recovery.breaching > 0,
+            },
+          ],
+        },
+        {
+          heading: 'What drags the score',
+          bars: clusters.slice(0, 6).map((c) => ({
+            label: c.label,
+            value: (Math.abs(c.npsDrag) / maxDrag) * 100,
+            display: `${c.npsDrag} NPS`,
+          })),
+          note: 'Association with detractor scores is diagnostic and requires business validation before it is treated as a cause.',
+        },
+        {
+          heading: 'Satisfaction by touchpoint',
+          columns: ['Touchpoint', 'CSAT', 'Satisfied', 'NPS', 'Responses'],
+          rows: touchpoints.map((t) => ({
+            cells: [
+              t.label,
+              `${t.csat} / 5`,
+              formatPercentValue(t.satisfiedPct),
+              String(t.nps),
+              formatNumber(t.responses),
+            ],
+            danger: t.csat < 3,
           })),
         },
       ]
@@ -494,6 +576,21 @@ export function ReportsGallery() {
               )}
             </section>
           ))}
+
+          {/*
+            The bridge into the feature. Managers discover feedback here; the
+            analysis, the evidence and the recovery queue live under CSAT & NPS,
+            and duplicating them into a report would split the story in two.
+          */}
+          {selected === 'customer-feedback' && (
+            <Link
+              href="/csat-nps/control-tower"
+              className="group flex items-center gap-1 text-[13px] font-semibold text-kpmg-blue transition-colors hover:text-kpmg-navy"
+            >
+              Open the Voice-of-Customer Control Tower
+              <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -101,6 +101,40 @@ export interface AIDraftResult {
   channel: AIDraftInput['channel']
 }
 
+/** One theme the analyser pulled out of a batch of verbatims. */
+export interface AIExtractedTheme {
+  label: string
+  aspect: string
+  sentiment: 'positive' | 'neutral' | 'negative'
+  /** 0..100 */
+  confidence: number
+  /** Spans from the source text, never paraphrased. */
+  evidence: string[]
+}
+
+export interface AIThemeExtraction {
+  themes: AIExtractedTheme[]
+  summary: string
+}
+
+export interface AIRootCauseInput {
+  theme: string
+  journeyStage: string
+  touchpoint: string
+  affectedResponses: number
+  npsDrag: number
+  correlation: number
+  evidence: string[]
+}
+
+export interface AIRootCauseResult {
+  /** Stated as a hypothesis, never as an established cause. */
+  hypothesis: string
+  correlates: string[]
+  /** 0..100 */
+  confidence: number
+}
+
 export interface AIService {
   readonly mode: AIMode
   /** Free-form completion — the escape hatch every other method builds on. */
@@ -120,4 +154,11 @@ export interface AIService {
   coachRep(input: AICoachingInput): Promise<AICoachingResult>
   /** Drafts an outbound message for a rep to send. */
   draftMessage(input: AIDraftInput): Promise<AIDraftResult>
+  /** Pulls themes out of a batch of open-text feedback. */
+  extractThemes(
+    verbatims: string[],
+    context?: Record<string, unknown>,
+  ): Promise<AIThemeExtraction>
+  /** Explains a root-cause cluster as a hypothesis requiring validation. */
+  explainRootCause(input: AIRootCauseInput): Promise<AIRootCauseResult>
 }
