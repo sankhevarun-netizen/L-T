@@ -5,11 +5,14 @@ import type {
   AICompletionRequest,
   AICompletionResult,
   AIDraftInput,
+  AIRootCauseInput,
+  AIRootCauseResult,
   AIDraftResult,
   AINextBestAction,
   AIService,
   AISentimentResult,
   AISummaryResult,
+  AIThemeExtraction,
 } from './types'
 
 /**
@@ -128,5 +131,30 @@ export class LiveAIService implements AIService {
       body: result.data.body,
       channel: input.channel,
     }
+  }
+
+  async extractThemes(
+    verbatims: string[],
+    context?: Record<string, unknown>,
+  ): Promise<AIThemeExtraction> {
+    const result = await this.call<AIThemeExtraction>(
+      'voc-themes',
+      `Group these ${verbatims.length} customer comments into themes by aspect. Quote spans verbatim.`,
+      { ...context, verbatims },
+    )
+
+    if (!result?.data) return this.fallback.extractThemes(verbatims, context)
+    return result.data
+  }
+
+  async explainRootCause(input: AIRootCauseInput): Promise<AIRootCauseResult> {
+    const result = await this.call<AIRootCauseResult>(
+      'root-cause',
+      `Explain why customers raising "${input.theme}" at the ${input.journeyStage} stage score lower. State a hypothesis, not a cause.`,
+      input as unknown as Record<string, unknown>,
+    )
+
+    if (!result?.data) return this.fallback.explainRootCause(input)
+    return result.data
   }
 }

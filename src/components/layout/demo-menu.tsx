@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronDown,
   CircleCheck,
+  Gauge,
   Play,
   RotateCcw,
   Sparkles,
@@ -96,6 +97,12 @@ export function DemoMenu() {
           <DropdownMenuItem onClick={() => router.push('/ai-insights')}>
             <Zap />
             Open the agent gallery
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => router.push('/csat-nps/detractor-recovery')}
+          >
+            <Gauge />
+            Run the CSAT story
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => router.push('/platform')}>
             <Workflow />
