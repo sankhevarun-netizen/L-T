@@ -1,0 +1,357 @@
+'use client'
+
+import Link from 'next/link'
+import { ArrowRight, MessageSquare, Sparkles } from 'lucide-react'
+
+import { IllustrativeBadge } from './guardrails'
+import {
+  BEAT_META,
+  FEEDBACK_TYPE_META,
+  TYPE_1_LIMITATIONS,
+  useCasesOfType,
+  type UseCaseDef,
+} from './use-cases'
+import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
+import { formatNumber } from '@/lib/format'
+import { cn } from '@/lib/utils'
+
+/**
+ * The hub.
+ *
+ * Renders the capability table as the product: two labelled type sections, all
+ * nine use cases named, and the limitation callout on the seam between them —
+ * where it lands on a reader who has just seen what is being limited.
+ */
+
+/** Live figure shown on each card, so the hub reads as a product not a slide. */
+type Metric = { label: string; value: string }
+
+function TypeOneCard({
+  useCase,
+  metric,
+}: {
+  useCase: UseCaseDef
+  metric: Metric
+}) {
+  const Icon = useCase.icon
+
+  return (
+    <Link
+      href={`/csat-nps/${useCase.slug}#${useCase.anchor}`}
+      className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card transition-shadow hover:shadow-card-hover"
+    >
+      {/* Flat slate band — Type 1 carries no narrative beat by design. */}
+      <div className="h-1 bg-slate-300" />
+
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex items-start gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+            <Icon className="size-4 text-slate-500" strokeWidth={2.1} />
+          </span>
+          <h3 className="mt-1 text-[13.5px] font-bold leading-snug tracking-[-0.01em] text-slate-900">
+            {useCase.name}
+          </h3>
+        </div>
+
+        {/* Slate numerals: the plainness is the argument, and a brand-blue
+            figure here would read as the same class of thing as Type 2. */}
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            {metric.label}
+          </p>
+          <p className="text-[22px] font-bold leading-tight text-slate-700">
+            {metric.value}
+          </p>
+        </div>
+
+        <p className="text-[11.5px] leading-snug text-slate-500">
+          {useCase.problem}
+        </p>
+
+        <p className="mt-auto pt-1 text-[11px] font-medium italic text-slate-400">
+          {useCase.aiAction}
+        </p>
+      </div>
+    </Link>
+  )
+}
+
+function TypeTwoCard({
+  useCase,
+  metric,
+  chip,
+}: {
+  useCase: UseCaseDef
+  metric: Metric
+  chip?: { text: string; tone: string }
+}) {
+  const Icon = useCase.icon
+  const beat = useCase.beat ? BEAT_META[useCase.beat] : undefined
+
+  return (
+    <Link
+      href={`/csat-nps/${useCase.slug}`}
+      className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card transition-shadow hover:shadow-card-hover"
+    >
+      {beat && (
+        <div
+          className={cn(
+            'px-3 py-1.5 text-[9.5px] font-bold uppercase tracking-[0.09em]',
+            beat.band,
+            beat.text,
+          )}
+        >
+          {beat.label}
+        </div>
+      )}
+
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div className="flex items-start gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-kpmg-blue/10">
+            <Icon className="size-4 text-kpmg-blue" strokeWidth={2.1} />
+          </span>
+          <h3 className="mt-1 text-[13.5px] font-bold leading-snug tracking-[-0.01em] text-slate-900">
+            {useCase.name}
+          </h3>
+        </div>
+
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              {metric.label}
+            </p>
+            <p className="text-[22px] font-bold leading-tight text-kpmg-blue">
+              {metric.value}
+            </p>
+          </div>
+          {chip && (
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                chip.tone,
+              )}
+            >
+              {chip.text}
+            </span>
+          )}
+        </div>
+
+        <p className="text-[11.5px] leading-snug text-slate-500">
+          {useCase.problem}
+        </p>
+
+        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+          {useCase.agentName && (
+            <span className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-kpmg-violet">
+              <Sparkles className="size-3" strokeWidth={2.3} />
+              {useCase.agentName}
+            </span>
+          )}
+          <IllustrativeBadge />
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+export function CsatNpsHub() {
+  const data = useFeedbackData()
+
+  const typeOneMetrics: Record<string, Metric> = {
+    'nps-performance': { label: 'NPS', value: `${data.nps.nps > 0 ? '+' : ''}${data.nps.nps}` },
+    'csat-service': {
+      label: 'Avg CSAT',
+      value: `${(
+        data.csatByTouchpoint.reduce((s, t) => s + t.csat, 0) /
+        Math.max(1, data.csatByTouchpoint.length)
+      ).toFixed(1)} / 5`,
+    },
+    'sentiment-reporting': {
+      label: 'Negative',
+      value: `${Math.round(
+        (data.sentiment.negative / Math.max(1, data.sentiment.total)) * 100,
+      )}%`,
+    },
+  }
+
+  const emerging = data.themes.filter((t) => t.emerging).length
+
+  const typeTwoMetrics: Record<
+    string,
+    { metric: Metric; chip?: { text: string; tone: string } }
+  > = {
+    'survey-optimizer': {
+      metric: { label: 'In queue', value: formatNumber(data.queue.queued.length) },
+      chip: {
+        text: `${data.queue.queueMeanPropensity} avg`,
+        tone: 'bg-emerald-50 text-emerald-700',
+      },
+    },
+    'feedback-journey': {
+      metric: {
+        label: 'Suppressed',
+        value: formatNumber(data.queue.suppressed.length),
+      },
+      chip: {
+        text: `${data.queue.responseRatePct}% response`,
+        tone: 'bg-sky-50 text-sky-700',
+      },
+    },
+    'voc-analyzer': {
+      metric: { label: 'Themes', value: formatNumber(data.themes.length) },
+      chip: emerging
+        ? { text: `${emerging} emerging`, tone: 'bg-amber-50 text-amber-700' }
+        : undefined,
+    },
+    'root-cause': {
+      metric: { label: 'Clusters', value: formatNumber(data.clusters.length) },
+      chip: data.clusters.length
+        ? {
+            text: `${data.clusters[0].npsDrag} NPS`,
+            tone: 'bg-red-50 text-red-700',
+          }
+        : undefined,
+    },
+    'detractor-recovery': {
+      metric: {
+        label: 'Open cases',
+        value: formatNumber(data.recovery.open + data.recovery.inProgress),
+      },
+      chip: data.recovery.breaching
+        ? {
+            text: `${data.recovery.breaching} breaching`,
+            tone: 'bg-red-50 text-red-700',
+          }
+        : undefined,
+    },
+    'control-tower': {
+      metric: {
+        label: 'Interventions',
+        value: formatNumber(data.interventions.length),
+      },
+      chip: {
+        text: `${data.recovery.closureRatePct}% closed`,
+        tone: 'bg-amber-50 text-amber-700',
+      },
+    },
+  }
+
+  return (
+    <div className="animate-fade-in space-y-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-rail-800 p-5 text-white shadow-card">
+        <div className="min-w-0">
+          <h2 className="text-[19px] font-bold tracking-[-0.01em]">
+            CSAT &amp; NPS Reporting
+          </h2>
+          <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-white/60">
+            Nine capabilities across two types. Traditional reporting says what
+            happened; the intelligence layer decides who to ask, explains why a
+            score moved, and turns a detractor into a governed recovery action.
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.09em] text-white/50">
+            Responses analysed
+          </p>
+          <p className="text-[26px] font-bold leading-tight">
+            {formatNumber(data.nps.responses)}
+          </p>
+        </div>
+      </div>
+
+      {/* Type 1 */}
+      <section className="space-y-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h3 className="text-[15px] font-bold tracking-[-0.01em] text-slate-900">
+              {FEEDBACK_TYPE_META['type-1'].label}
+            </h3>
+            <p className="mt-0.5 text-[11.5px] text-slate-500">
+              {FEEDBACK_TYPE_META['type-1'].blurb}
+            </p>
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+            {FEEDBACK_TYPE_META['type-1'].caption}
+          </span>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          {useCasesOfType('type-1').map((useCase) => (
+            <TypeOneCard
+              key={useCase.anchor}
+              useCase={useCase}
+              metric={typeOneMetrics[useCase.anchor ?? ''] ?? { label: '', value: '—' }}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* The turn */}
+      <section className="rounded-xl border border-slate-200 border-l-[3px] border-l-amber-500 bg-white p-4 shadow-card">
+        <div className="flex items-start gap-2">
+          <MessageSquare
+            className="mt-0.5 size-4 shrink-0 text-amber-600"
+            strokeWidth={2.1}
+          />
+          <div className="min-w-0 flex-1">
+            <h4 className="text-[13px] font-bold text-slate-900">
+              Type 1 limitation
+            </h4>
+            <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">
+              Traditional reporting shows scores, trends and sentiment
+              distribution. It does not determine any of the following — each
+              one is a Type 2 capability.
+            </p>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {TYPE_1_LIMITATIONS.map((row) => (
+                <Link
+                  key={row.slug}
+                  href={`/csat-nps/${row.slug}`}
+                  className="group flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 transition-colors hover:bg-kpmg-blue/5"
+                >
+                  <span className="min-w-0 text-[11.5px] font-medium text-slate-600">
+                    {row.question}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-kpmg-blue">
+                    {row.answeredBy}
+                    <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Type 2 */}
+      <section className="space-y-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h3 className="text-[15px] font-bold tracking-[-0.01em] text-slate-900">
+              {FEEDBACK_TYPE_META['type-2'].label}
+            </h3>
+            <p className="mt-0.5 text-[11.5px] text-slate-500">
+              {FEEDBACK_TYPE_META['type-2'].blurb}
+            </p>
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+            {FEEDBACK_TYPE_META['type-2'].caption}
+          </span>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {useCasesOfType('type-2').map((useCase) => (
+            <TypeTwoCard
+              key={useCase.slug}
+              useCase={useCase}
+              metric={typeTwoMetrics[useCase.slug]?.metric ?? { label: '', value: '—' }}
+              chip={typeTwoMetrics[useCase.slug]?.chip}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
