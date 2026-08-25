@@ -145,9 +145,7 @@ function SectionHead({
 }) {
   return (
     <div id={id} className="scroll-mt-4">
-      <h3 className="text-[15px] font-bold tracking-[-0.01em] text-slate-900">
-        {title}
-      </h3>
+      <h3 className="section-title">{title}</h3>
       <p className="mt-0.5 text-[11.5px] text-slate-500">{caption}</p>
     </div>
   )

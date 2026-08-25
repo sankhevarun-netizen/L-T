@@ -48,7 +48,7 @@ function TypeOneCard({
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
             <Icon className="size-4 text-slate-500" strokeWidth={2.1} />
           </span>
-          <h3 className="mt-1 text-[13.5px] font-bold leading-snug tracking-[-0.01em] text-slate-900">
+          <h3 className="mt-1 text-[14px] font-bold leading-snug tracking-[-0.01em] text-slate-900">
             {useCase.name}
           </h3>
         </div>
@@ -110,7 +110,7 @@ function TypeTwoCard({
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-kpmg-blue/10">
             <Icon className="size-4 text-kpmg-blue" strokeWidth={2.1} />
           </span>
-          <h3 className="mt-1 text-[13.5px] font-bold leading-snug tracking-[-0.01em] text-slate-900">
+          <h3 className="mt-1 text-[14px] font-bold leading-snug tracking-[-0.01em] text-slate-900">
             {useCase.name}
           </h3>
         </div>
@@ -262,16 +262,19 @@ export function CsatNpsHub() {
 
       {/* Type 1 */}
       <section className="space-y-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h3 className="text-[15px] font-bold tracking-[-0.01em] text-slate-900">
-              {FEEDBACK_TYPE_META['type-1'].label}
-            </h3>
-            <p className="mt-0.5 text-[11.5px] text-slate-500">
-              {FEEDBACK_TYPE_META['type-1'].blurb}
-            </p>
-          </div>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h3
+            className={cn(
+              'text-[13px] font-bold uppercase tracking-wider',
+              FEEDBACK_TYPE_META['type-1'].accent,
+            )}
+          >
+            {FEEDBACK_TYPE_META['type-1'].label}
+          </h3>
+          <p className="min-w-0 text-[11.5px] text-slate-400">
+            {FEEDBACK_TYPE_META['type-1'].blurb}
+          </p>
+          <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-500">
             {FEEDBACK_TYPE_META['type-1'].caption}
           </span>
         </div>
@@ -327,16 +330,19 @@ export function CsatNpsHub() {
 
       {/* Type 2 */}
       <section className="space-y-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h3 className="text-[15px] font-bold tracking-[-0.01em] text-slate-900">
-              {FEEDBACK_TYPE_META['type-2'].label}
-            </h3>
-            <p className="mt-0.5 text-[11.5px] text-slate-500">
-              {FEEDBACK_TYPE_META['type-2'].blurb}
-            </p>
-          </div>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h3
+            className={cn(
+              'text-[13px] font-bold uppercase tracking-wider',
+              FEEDBACK_TYPE_META['type-2'].accent,
+            )}
+          >
+            {FEEDBACK_TYPE_META['type-2'].label}
+          </h3>
+          <p className="min-w-0 text-[11.5px] text-slate-400">
+            {FEEDBACK_TYPE_META['type-2'].blurb}
+          </p>
+          <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-500">
             {FEEDBACK_TYPE_META['type-2'].caption}
           </span>
         </div>
