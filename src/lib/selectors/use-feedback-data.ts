@@ -1,0 +1,80 @@
+'use client'
+
+import { useMemo } from 'react'
+
+import { useCrmStore } from '@/store/crm-store'
+import {
+  selectCsatByTouchpoint,
+  selectDrivers,
+  selectInterventions,
+  selectJourneyHeatmap,
+  selectNpsSummary,
+  selectNpsTrend,
+  selectPropensityHeatmap,
+  selectRecoveryQueue,
+  selectRecoverySummary,
+  selectRootCauseClusters,
+  selectSentimentBreakdown,
+  selectSurveyQueue,
+  selectThemes,
+} from './feedback'
+
+/**
+ * One pass over the feedback book, shared by every screen in the feature.
+ *
+ * Theme extraction walks every verbatim, and the clusters, drivers and
+ * interventions all derive from it — computing them per screen would repeat the
+ * same scan four times on a book this size.
+ */
+export function useFeedbackData() {
+  const surveyInvites = useCrmStore((s) => s.surveyInvites)
+  const surveyResponses = useCrmStore((s) => s.surveyResponses)
+  const recoveryCases = useCrmStore((s) => s.recoveryCases)
+
+  return useMemo(() => {
+    const themes = selectThemes(surveyResponses)
+    const clusters = selectRootCauseClusters(surveyResponses, themes)
+
+    return {
+      invites: surveyInvites,
+      responses: surveyResponses,
+      cases: recoveryCases,
+
+      /* Type 1 */
+      nps: selectNpsSummary(surveyResponses),
+      npsTrend: selectNpsTrend(surveyResponses),
+      csatByTouchpoint: selectCsatByTouchpoint(surveyResponses),
+      sentiment: selectSentimentBreakdown(surveyResponses),
+
+      /* Type 2 */
+      themes,
+      clusters,
+      journeyHeatmap: selectJourneyHeatmap(surveyResponses),
+      queue: selectSurveyQueue(surveyInvites),
+      propensityHeatmap: selectPropensityHeatmap(surveyInvites),
+      recoveryQueue: selectRecoveryQueue(surveyResponses, recoveryCases),
+      recovery: selectRecoverySummary(surveyResponses, recoveryCases),
+      drivers: selectDrivers(surveyResponses, themes),
+      interventions: selectInterventions(clusters),
+    }
+  }, [surveyInvites, surveyResponses, recoveryCases])
+}
+
+/** Everything recorded against one customer, for the Customer 360 drill-in. */
+export function useFeedbackForLead(leadId: string) {
+  const surveyInvites = useCrmStore((s) => s.surveyInvites)
+  const surveyResponses = useCrmStore((s) => s.surveyResponses)
+  const recoveryCases = useCrmStore((s) => s.recoveryCases)
+
+  return useMemo(() => {
+    const responses = surveyResponses.filter((r) => r.leadId === leadId)
+    return {
+      invites: surveyInvites.filter((i) => i.leadId === leadId),
+      responses,
+      cases: recoveryCases.filter((c) => c.leadId === leadId),
+      latest: responses.sort((a, b) =>
+        b.respondedAt.localeCompare(a.respondedAt),
+      )[0],
+    }
+  }, [surveyInvites, surveyResponses, recoveryCases, leadId])
+}

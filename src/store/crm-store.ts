@@ -10,10 +10,13 @@ import type {
   Engagement,
   Lead,
   Payment,
+  RecoveryCase,
   ServiceTicket,
   SfActivity,
   SfTask,
   SiteVisit,
+  SurveyInvite,
+  SurveyResponse,
   Transcript,
 } from '@/types'
 
@@ -30,6 +33,7 @@ import type {
 
 let activitySeq = 0
 let taskSeq = 0
+let recoverySeq = 0
 
 function nextId(prefix: string, seq: number) {
   return `${prefix}-${String(seq).padStart(5, '0')}`
@@ -47,6 +51,9 @@ export interface CrmState {
   transcripts: Transcript[]
   tasks: SfTask[]
   activities: SfActivity[]
+  surveyInvites: SurveyInvite[]
+  surveyResponses: SurveyResponse[]
+  recoveryCases: RecoveryCase[]
 
   /** Campaigns DICE has suppressed outreach on. */
   suppressedCampaignIds: string[]
@@ -81,6 +88,25 @@ export interface CrmState {
   suppressCampaign: (campaignId: string, reason: string) => void
   ingestSanitizedData: (leadIds: string[]) => void
 
+  /* ---- feedback writes ---- */
+  createRecoveryCase: (input: {
+    responseId: string
+    leadId: string
+    ownerId: string
+    severity: RecoveryCase['severity']
+    themeId: string
+    slaDays: number
+    recommendedResponse: string
+    sourceTicketId?: string
+  }) => RecoveryCase
+  updateRecoveryCase: (
+    id: string,
+    patch: Partial<RecoveryCase>,
+    note?: string,
+  ) => void
+  scheduleSurveyInvite: (inviteId: string, reason: string) => void
+  suppressSurveyInvite: (inviteId: string, reason: string) => void
+
   resetDemoData: () => void
 }
 
@@ -101,6 +127,9 @@ function seedState() {
     transcripts: data.transcripts,
     tasks: data.tasks,
     activities: [] as SfActivity[],
+    surveyInvites: data.surveyInvites,
+    surveyResponses: data.surveyResponses,
+    recoveryCases: data.recoveryCases,
     suppressedCampaignIds: [] as string[],
     // Only leads whose history has been ingested can be reasoned over.
     ingestedLeadIds: data.leads.filter((l) => l.ingested).map((l) => l.id),
@@ -287,9 +316,167 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       }
     }),
 
+  /**
+   * Opens a recovery case. Called only after a human approves the agent's
+   * recommendation — the copilot proposes, the user commits.
+   */
+  createRecoveryCase: (input) => {
+    recoverySeq += 1
+    const response = get().surveyResponses.find((r) => r.id === input.responseId)
+    const name = response?.customerName ?? input.leadId
+
+    const recoveryCase: RecoveryCase = {
+      id: nextId('REC-NEW', recoverySeq),
+      responseId: input.responseId,
+      leadId: input.leadId,
+      customerName: name,
+      severity: input.severity,
+      themeId: input.themeId,
+      ownerId: input.ownerId,
+      openedAt: DEMO_NOW.toISOString(),
+      slaDueAt: new Date(
+        DEMO_NOW.getTime() + input.slaDays * 86_400_000,
+      ).toISOString(),
+      status: 'open',
+      recommendedResponse: input.recommendedResponse,
+      escalationPath: ['Owner', 'Customer Care lead', 'Head of CX'],
+      timeline: [
+        {
+          at: DEMO_NOW.toISOString(),
+          actor: 'DICE',
+          note: 'Recovery case opened after human review of the recommendation.',
+        },
+      ],
+      sourceTicketId: input.sourceTicketId,
+    }
+
+    activitySeq += 1
+    set((state) => ({
+      recoveryCases: [recoveryCase, ...state.recoveryCases],
+      activities: [
+        {
+          id: nextId('ACT', activitySeq),
+          object: 'Activity' as const,
+          recordId: recoveryCase.id,
+          recordName: name,
+          action: 'Recovery case opened',
+          detail: `${input.severity} severity · SLA ${input.slaDays} day(s)`,
+          source: 'DICE' as const,
+          at: DEMO_NOW.toISOString(),
+        },
+        ...state.activities,
+      ],
+    }))
+
+    return recoveryCase
+  },
+
+  updateRecoveryCase: (id, patch, note) =>
+    set((state) => {
+      const existing = state.recoveryCases.find((c) => c.id === id)
+      if (!existing) return state
+
+      const updated: RecoveryCase = {
+        ...existing,
+        ...patch,
+        timeline: note
+          ? [
+              ...existing.timeline,
+              { at: DEMO_NOW.toISOString(), actor: 'DICE', note },
+            ]
+          : existing.timeline,
+      }
+
+      activitySeq += 1
+      return {
+        recoveryCases: state.recoveryCases.map((c) => (c.id === id ? updated : c)),
+        activities: [
+          {
+            id: nextId('ACT', activitySeq),
+            object: 'Activity' as const,
+            recordId: id,
+            recordName: existing.customerName,
+            action: `Recovery case ${patch.status ?? 'updated'}`,
+            detail: note ?? `${Object.keys(patch).length} field(s) updated`,
+            source: 'DICE' as const,
+            at: DEMO_NOW.toISOString(),
+          },
+          ...state.activities,
+        ],
+      }
+    }),
+
+  scheduleSurveyInvite: (inviteId, reason) =>
+    set((state) => {
+      const invite = state.surveyInvites.find((i) => i.id === inviteId)
+      if (!invite) return state
+
+      const updated: SurveyInvite = {
+        ...invite,
+        status: 'sent',
+        eligible: true,
+        suppressedReason: undefined,
+        sentAt: DEMO_NOW.toISOString(),
+      }
+
+      activitySeq += 1
+      return {
+        surveyInvites: state.surveyInvites.map((i) =>
+          i.id === inviteId ? updated : i,
+        ),
+        activities: [
+          {
+            id: nextId('ACT', activitySeq),
+            object: 'Activity' as const,
+            recordId: inviteId,
+            recordName: invite.customerName,
+            action: 'Survey invite scheduled',
+            detail: `${invite.channel} · ${invite.recommendedWindow} — ${reason}`,
+            source: 'DICE' as const,
+            at: DEMO_NOW.toISOString(),
+          },
+          ...state.activities,
+        ],
+      }
+    }),
+
+  suppressSurveyInvite: (inviteId, reason) =>
+    set((state) => {
+      const invite = state.surveyInvites.find((i) => i.id === inviteId)
+      if (!invite) return state
+
+      const updated: SurveyInvite = {
+        ...invite,
+        status: 'suppressed',
+        eligible: false,
+        suppressedReason: reason,
+      }
+
+      activitySeq += 1
+      return {
+        surveyInvites: state.surveyInvites.map((i) =>
+          i.id === inviteId ? updated : i,
+        ),
+        activities: [
+          {
+            id: nextId('ACT', activitySeq),
+            object: 'Activity' as const,
+            recordId: inviteId,
+            recordName: invite.customerName,
+            action: 'Survey invite suppressed',
+            detail: reason,
+            source: 'DICE' as const,
+            at: DEMO_NOW.toISOString(),
+          },
+          ...state.activities,
+        ],
+      }
+    }),
+
   resetDemoData: () => {
     activitySeq = 0
     taskSeq = 0
+    recoverySeq = 0
     set(seedState())
   },
 }))

@@ -1,4 +1,6 @@
+import { buildFeedback } from './feedback-generator'
 import { FEATURED_PROFILES, FEATURED_TRANSCRIPTS } from './featured'
+import { Rng } from './rng'
 import {
   CAMPAIGNS,
   DEMO_NOW,
@@ -17,9 +19,12 @@ import type {
   JourneyStage,
   Lead,
   Payment,
+  RecoveryCase,
   ServiceTicket,
   SfTask,
   SiteVisit,
+  SurveyInvite,
+  SurveyResponse,
   Transcript,
 } from '@/types'
 
@@ -32,38 +37,6 @@ import type {
  * this produces. A fixed PRNG seed plus the DEMO_NOW clock means the server and
  * the browser build byte-identical data.
  */
-
-/* ---------------------------- PRNG ---------------------------- */
-
-function mulberry32(seed: number) {
-  let a = seed >>> 0
-  return function next() {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-class Rng {
-  private next: () => number
-  constructor(seed: number) {
-    this.next = mulberry32(seed)
-  }
-  float(min = 0, max = 1) {
-    return min + this.next() * (max - min)
-  }
-  int(min: number, max: number) {
-    return Math.floor(this.float(min, max + 1))
-  }
-  pick<T>(items: readonly T[]): T {
-    return items[Math.floor(this.next() * items.length)]
-  }
-  chance(p: number) {
-    return this.next() < p
-  }
-}
 
 /* ------------------------ Tuning constants ------------------------ */
 
@@ -216,6 +189,9 @@ export interface SeedDataset {
   serviceTickets: ServiceTicket[]
   transcripts: Transcript[]
   tasks: SfTask[]
+  surveyInvites: SurveyInvite[]
+  surveyResponses: SurveyResponse[]
+  recoveryCases: RecoveryCase[]
 }
 
 export function buildSeedDataset(): SeedDataset {
@@ -727,6 +703,10 @@ export function buildSeedDataset(): SeedDataset {
     })
   }
 
+  /* ---- 8. Feedback, on its own PRNG ---- */
+
+  const feedback = buildFeedback({ leads, bookings, siteVisits, serviceTickets })
+
   return {
     leads,
     customers,
@@ -737,5 +717,6 @@ export function buildSeedDataset(): SeedDataset {
     serviceTickets,
     transcripts: FEATURED_TRANSCRIPTS,
     tasks,
+    ...feedback,
   }
 }

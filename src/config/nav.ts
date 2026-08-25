@@ -1,6 +1,7 @@
 import {
   Bot,
   BarChart3,
+  Gauge,
   Building2,
   CalendarCheck,
   ClipboardList,
@@ -137,6 +138,14 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: MessagesSquare,
         title: 'Service Assistant',
         subtitle: 'Summarise tickets, assess SLA risk, recommend resolution.',
+      },
+      {
+        label: 'CSAT & NPS',
+        href: '/csat-nps',
+        icon: Gauge,
+        title: 'CSAT & NPS Reporting',
+        subtitle:
+          'From descriptive scores to governed feedback intelligence — nine capabilities across two types.',
       },
       {
         label: 'Persona Mapping',

@@ -371,3 +371,183 @@ export interface AgentforceVsDice {
     adds: string[]
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* CSAT & NPS — customer feedback intelligence                         */
+/* ------------------------------------------------------------------ */
+
+/** Standard NPS banding: 9–10 promoter, 7–8 passive, 0–6 detractor. */
+export type NpsBand = 'promoter' | 'passive' | 'detractor'
+
+export type SurveyChannel = 'whatsapp' | 'email' | 'sms' | 'call' | 'in-app'
+
+/** The journey moments a survey can be attached to. */
+export type TouchpointId =
+  | 'sales'
+  | 'site-visit'
+  | 'documentation'
+  | 'payment'
+  | 'handover'
+  | 'service'
+
+export const TOUCHPOINT_ORDER: TouchpointId[] = [
+  'sales',
+  'site-visit',
+  'documentation',
+  'payment',
+  'handover',
+  'service',
+]
+
+export const TOUCHPOINT_LABEL: Record<TouchpointId, string> = {
+  sales: 'Sales',
+  'site-visit': 'Site Visit',
+  documentation: 'Documentation',
+  payment: 'Payment',
+  handover: 'Handover',
+  service: 'Service',
+}
+
+/**
+ * A survey the platform decided to send — or decided not to.
+ *
+ * The Participation Optimizer reasons over these: `responsePropensity` is the
+ * prediction, `eligible` + `suppressedReason` is the restraint. A demo has to
+ * show both halves, or "optimiser" just means "send more".
+ */
+export interface SurveyInvite {
+  id: string
+  leadId: string
+  customerName: string
+  touchpoint: TouchpointId
+  journeyStage: JourneyStage
+  channel: SurveyChannel
+  /** Undefined until the invite is actually sent — queued invites have none. */
+  sentAt?: string
+  respondedAt?: string
+  status: 'queued' | 'sent' | 'responded' | 'abandoned' | 'expired' | 'suppressed'
+  /** 0–100 predicted response likelihood. Illustrative until validated. */
+  responsePropensity: number
+  /** Surveys already sent to this customer in the trailing 90 days. */
+  fatigueScore: number
+  /** Recommended send window, e.g. "Tue 10:00–12:00". */
+  recommendedWindow: string
+  eligible: boolean
+  /** Populated when `eligible` is false — why the optimiser held back. */
+  suppressedReason?: string
+  /** Signals behind the propensity score, shown as evidence. */
+  signals: string[]
+  featured?: boolean
+}
+
+export interface SurveyResponse {
+  id: string
+  inviteId: string
+  leadId: string
+  customerName: string
+  touchpoint: TouchpointId
+  projectId: string
+  projectName: string
+  personaId?: string
+  journeyStage: JourneyStage
+  /** 0–10 as collected. */
+  npsScore: number
+  npsBand: NpsBand
+  /** 1–5 for the touchpoint being rated. */
+  csatScore: number
+  verbatim: string
+  sentiment: Sentiment
+  channel: SurveyChannel
+  respondedAt: string
+  /** Ticket that preceded this response, when one did — see the recovery chain. */
+  sourceTicketId?: string
+  featured?: boolean
+}
+
+/** One theme extracted from open text, with the spans that justified it. */
+export interface FeedbackTheme {
+  id: string
+  label: string
+  /** Set when this is a sub-theme — drives the theme hierarchy view. */
+  parentId?: string
+  aspect: string
+  sentiment: Sentiment
+  /** 0–100. Illustrative until validated. */
+  confidence: number
+  mentions: number
+  responseIds: string[]
+  /** Verbatim spans backing the theme — never paraphrased. */
+  evidence: string[]
+  /** Low-volume but accelerating; the confidence indicator earns its place here. */
+  emerging: boolean
+  suggestedCrmTag: string
+}
+
+/**
+ * Related themes grouped against a journey stage.
+ *
+ * `correlation` is a diagnostic signal requiring business validation, never a
+ * causal claim — the UI copy must say so.
+ */
+export interface RootCauseCluster {
+  id: string
+  label: string
+  themeIds: string[]
+  journeyStage: JourneyStage
+  touchpoint: TouchpointId
+  projectIds: string[]
+  /** Times this pattern has recurred across the trailing window. */
+  repeatCount: number
+  /** -1..1, diagnostic only. */
+  correlation: number
+  affectedResponses: number
+  /** Mean NPS of affected responses minus book mean — negative is drag. */
+  npsDrag: number
+  evidence: string[]
+}
+
+export interface RecoveryCase {
+  id: string
+  responseId: string
+  leadId: string
+  customerName: string
+  severity: Severity
+  themeId: string
+  ownerId: string
+  openedAt: string
+  slaDueAt: string
+  closedAt?: string
+  status: 'proposed' | 'open' | 'in-progress' | 'closed' | 'escalated'
+  /** Drafted for a human to approve — never auto-sent. */
+  recommendedResponse: string
+  escalationPath: string[]
+  timeline: { at: string; actor: string; note: string }[]
+  closureEvidence?: string
+  /** Set when the detractor signal originated in an SLA-breached ticket. */
+  sourceTicketId?: string
+}
+
+/** Governed question library backing the Dynamic Feedback Journey composer. */
+export interface SurveyQuestion {
+  id: string
+  text: string
+  type: 'nps' | 'csat' | 'open-text' | 'choice'
+  /** Standard NPS wording is locked — rendered read-only, never edited. */
+  locked: boolean
+  touchpoints: TouchpointId[]
+  personaIds?: string[]
+  journeyStages?: JourneyStage[]
+  choices?: string[]
+}
+
+export interface Intervention {
+  id: string
+  title: string
+  clusterId: string
+  /** 1–10, both configured rather than inferred. */
+  impact: number
+  effort: number
+  owner: string
+  status: 'backlog' | 'planned' | 'in-flight' | 'done'
+  slaDueAt?: string
+}
