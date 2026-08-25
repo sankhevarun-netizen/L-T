@@ -77,6 +77,32 @@ export const salesforceCrm = {
     useCrmStore.getState().upsertContact(customer)
   },
 
+  scheduleSurveyInvite(inviteId: string, reason: string) {
+    useCrmStore.getState().scheduleSurveyInvite(inviteId, reason)
+  },
+
+  suppressSurveyInvite(inviteId: string, reason: string) {
+    useCrmStore.getState().suppressSurveyInvite(inviteId, reason)
+  },
+
+  createRecoveryCase(
+    input: Parameters<
+      ReturnType<typeof useCrmStore.getState>['createRecoveryCase']
+    >[0],
+  ) {
+    return useCrmStore.getState().createRecoveryCase(input)
+  },
+
+  updateRecoveryCase(
+    id: string,
+    patch: Parameters<
+      ReturnType<typeof useCrmStore.getState>['updateRecoveryCase']
+    >[1],
+    note?: string,
+  ) {
+    useCrmStore.getState().updateRecoveryCase(id, patch, note)
+  },
+
   suppressCampaign(campaignId: string, reason: string) {
     useCrmStore.getState().suppressCampaign(campaignId, reason)
   },

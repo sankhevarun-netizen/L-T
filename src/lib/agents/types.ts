@@ -2,6 +2,7 @@ import type { SeedCampaign } from '@/data/reference'
 import type { AIService } from '@/lib/ai'
 import type {
   Booking,
+  RecoveryCase,
   Engagement,
   Lead,
   Payment,
@@ -10,6 +11,8 @@ import type {
   SfActivity,
   SfTask,
   SiteVisit,
+  SurveyInvite,
+  SurveyResponse,
 } from '@/types'
 
 /**
@@ -90,6 +93,9 @@ export interface AgentContext {
   tasks: SfTask[]
   campaigns: SeedCampaign[]
   ingestedLeadIds: string[]
+  surveyInvites: SurveyInvite[]
+  surveyResponses: SurveyResponse[]
+  recoveryCases: RecoveryCase[]
   ai: AIService
 }
 
@@ -140,6 +146,31 @@ export type CrmWrite =
       detail: string
     }
   | { kind: 'suppress-campaign'; campaignId: string; reason: string }
+  | {
+      kind: 'schedule-survey'
+      inviteId: string
+      leadId: string
+      reason: string
+    }
+  | { kind: 'suppress-survey'; inviteId: string; leadId: string; reason: string }
+  | {
+      kind: 'create-recovery-case'
+      responseId: string
+      leadId: string
+      ownerId: string
+      severity: Severity
+      themeId: string
+      slaDays: number
+      recommendedResponse: string
+      sourceTicketId?: string
+    }
+  | {
+      kind: 'tag-feedback'
+      responseId: string
+      recordName: string
+      tag: string
+      reason: string
+    }
   | { kind: 'ingest-sanitized'; leadIds: string[] }
   | {
       kind: 'update-lead'

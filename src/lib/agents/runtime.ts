@@ -100,6 +100,42 @@ export function executeWrite(write: CrmWrite): string {
       salesforceCrm.ingestSanitizedData(write.leadIds)
       return `${write.leadIds.length} record(s) ingested via EAI`
     }
+
+    case 'schedule-survey': {
+      salesforceCrm.scheduleSurveyInvite(write.inviteId, write.reason)
+      return `Survey invite ${write.inviteId} scheduled`
+    }
+
+    case 'suppress-survey': {
+      salesforceCrm.suppressSurveyInvite(write.inviteId, write.reason)
+      return `Survey invite ${write.inviteId} suppressed — ${write.reason}`
+    }
+
+    case 'create-recovery-case': {
+      const recoveryCase = salesforceCrm.createRecoveryCase({
+        responseId: write.responseId,
+        leadId: write.leadId,
+        ownerId: write.ownerId,
+        severity: write.severity,
+        themeId: write.themeId,
+        slaDays: write.slaDays,
+        recommendedResponse: write.recommendedResponse,
+        sourceTicketId: write.sourceTicketId,
+      })
+      return `Recovery case ${recoveryCase.id} opened for ${recoveryCase.customerName}`
+    }
+
+    case 'tag-feedback': {
+      salesforceCrm.logActivity({
+        object: 'Activity',
+        recordId: write.responseId,
+        recordName: write.recordName,
+        action: `Feedback tagged ${write.tag}`,
+        detail: write.reason,
+        source: 'DICE',
+      })
+      return `${write.recordName}: tagged ${write.tag}`
+    }
   }
 }
 
