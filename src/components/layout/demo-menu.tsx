@@ -36,6 +36,10 @@ export function DemoMenu() {
   const resetDemoData = useCrmStore((s) => s.resetDemoData)
   const activityCount = useCrmStore((s) => s.activities.length)
 
+  const dataSource = useSettingsStore((s) => s.dataSource)
+  const clientDataAvailable = useSettingsStore((s) => s.clientDataAvailable)
+  const setDataSource = useSettingsStore((s) => s.setDataSource)
+
   const aiMode = useSettingsStore((s) => s.aiMode)
   const setAiMode = useSettingsStore((s) => s.setAiMode)
   const liveAvailable = useSettingsStore((s) => s.liveAvailable)
@@ -108,6 +112,45 @@ export function DemoMenu() {
             <Workflow />
             Show the architecture
           </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuLabel>Data source</DropdownMenuLabel>
+          <div className="px-1.5 pb-1">
+            <div className="flex rounded-lg border border-slate-200 p-0.5">
+              {(
+                [
+                  { key: 'example' as const, label: 'Example' },
+                  { key: 'client' as const, label: 'Client' },
+                ]
+              ).map((option) => {
+                const disabled = option.key === 'client' && !clientDataAvailable
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setDataSource(option.key)}
+                    className={cn(
+                      'flex-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors',
+                      dataSource === option.key
+                        ? 'bg-kpmg-navy text-white'
+                        : 'text-slate-500 hover:text-slate-800',
+                      disabled &&
+                        'cursor-not-allowed opacity-40 hover:text-slate-500',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-1.5 px-1 text-[10.5px] leading-snug text-slate-400">
+              {clientDataAvailable
+                ? 'Connected to the client org.'
+                : 'Running on synthetic demonstration data. Connecting a client org is a separate, deliberate step — no client records are reachable from this build.'}
+            </p>
+          </div>
 
           <DropdownMenuSeparator />
 
