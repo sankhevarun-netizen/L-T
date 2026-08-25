@@ -15,6 +15,7 @@ import type {
   AgentFinding,
   CrmWrite,
 } from './types'
+import { FEEDBACK_AGENTS } from './feedback-agents'
 import type { Lead, Severity } from '@/types'
 
 /**
@@ -44,13 +45,13 @@ export function riskDigest(ctx: AgentContext) {
   return selectRiskAlerts(ctx.leads, ctx.tasks, ctx.serviceTickets)
 }
 
-function finding(
+export function finding(
   partial: Omit<AgentFinding, 'id'> & { id?: string },
 ): AgentFinding {
   return { id: partial.id ?? `f-${partial.subjectName}-${partial.headline}`, ...partial }
 }
 
-function plan(
+export function plan(
   agentId: string,
   f: AgentFinding,
   label: string,
@@ -72,7 +73,7 @@ function plan(
 }
 
 /** Shared scaffolding: rules run sync, the AI narrative wraps them. */
-function defineAgent(
+export function defineAgent(
   spec: Omit<Agent, 'detect'> & {
     narrate?: (findings: AgentFinding[], ctx: AgentContext) => string
   },
@@ -852,6 +853,7 @@ export const AGENTS: Agent[] = [
   riskDashboardAgent,
   serviceAgent,
   nextBestActionAgent,
+  ...FEEDBACK_AGENTS,
 ]
 
 export const AGENTS_BY_ID = Object.fromEntries(

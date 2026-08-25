@@ -10,5 +10,6 @@ export {
   nextBestActionQueue,
   riskDigest,
 } from './registry'
+export { FEEDBACK_AGENTS, detractorCount } from './feedback-agents'
 export { runAgent, executeAction, executeWrite } from './runtime'
 export { useAgentContext } from './use-agent-context'

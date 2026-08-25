@@ -17,6 +17,9 @@ export function useAgentContext(): AgentContext {
   const serviceTickets = useCrmStore((s) => s.serviceTickets)
   const tasks = useCrmStore((s) => s.tasks)
   const ingestedLeadIds = useCrmStore((s) => s.ingestedLeadIds)
+  const surveyInvites = useCrmStore((s) => s.surveyInvites)
+  const surveyResponses = useCrmStore((s) => s.surveyResponses)
+  const recoveryCases = useCrmStore((s) => s.recoveryCases)
   const ai = useAIService()
 
   return useMemo(
@@ -30,6 +33,9 @@ export function useAgentContext(): AgentContext {
       tasks,
       campaigns: CAMPAIGNS,
       ingestedLeadIds,
+      surveyInvites,
+      surveyResponses,
+      recoveryCases,
       ai,
     }),
     [
@@ -41,6 +47,9 @@ export function useAgentContext(): AgentContext {
       serviceTickets,
       tasks,
       ingestedLeadIds,
+      surveyInvites,
+      surveyResponses,
+      recoveryCases,
       ai,
     ],
   )
