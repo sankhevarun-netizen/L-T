@@ -305,12 +305,12 @@ export function CsatNpsHub() {
           />
           <div className="min-w-0 flex-1">
             <h4 className="text-[13px] font-bold text-slate-900">
-              Type 1 limitation
+              Where traditional reporting stops
             </h4>
             <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">
               Traditional reporting shows scores, trends and sentiment
               distribution. It does not determine any of the following — each
-              one is a Type 2 capability.
+              one is answered by the intelligence layer below.
             </p>
 
             <div className="mt-3 grid gap-2 sm:grid-cols-2">

@@ -19,6 +19,11 @@ import {
  * the same artefact rather than drifting apart.
  */
 
+/**
+ * Internal only. "Type 1" and "Type 2" are the brief's own taxonomy and useful
+ * for reasoning about the feature, but they mean nothing to a client, so they
+ * stay out of every rendered string.
+ */
 export type FeedbackType = 'type-1' | 'type-2'
 
 /** The three-beat narrative the Type 2 screens are ordered by. */
@@ -29,7 +34,7 @@ export const FEEDBACK_TYPE_META: Record<
   { label: string; blurb: string; caption: string; accent: string }
 > = {
   'type-1': {
-    label: 'Type 1 — Traditional CSAT & NPS Reporting',
+    label: 'Traditional CSAT & NPS Reporting',
     blurb:
       'Descriptive reporting. Answers what happened, and establishes the baseline.',
     caption: 'Minimal AI value addition',
@@ -37,7 +42,7 @@ export const FEEDBACK_TYPE_META: Record<
     accent: 'text-slate-500',
   },
   'type-2': {
-    label: 'Type 2 — AI-Powered Customer Feedback Intelligence',
+    label: 'AI-Powered Customer Feedback Intelligence',
     blurb:
       'Extends reporting into prediction, personalisation, diagnosis and action orchestration.',
     caption: 'Prediction · Diagnosis · Orchestration',

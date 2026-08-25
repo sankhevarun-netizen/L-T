@@ -53,7 +53,7 @@ function SegmentedBar({ active }: { active: string }) {
       {(['type-1', 'type-2'] as FeedbackType[]).map((type) => (
         <div key={type} className="flex items-center gap-1">
           <span className="px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
-            {type === 'type-1' ? 'Type 1' : 'Type 2'}
+            {type === 'type-1' ? 'Traditional' : 'AI-Powered'}
           </span>
           {ROUTE_ORDER.filter((r) => r.type === type).map((route) => (
             <Link
