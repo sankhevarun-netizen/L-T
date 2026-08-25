@@ -5,6 +5,8 @@ import { ArrowLeft, Sparkles } from 'lucide-react'
 
 import { ComingSoon } from '@/components/layout/coming-soon'
 import { IllustrativeBanner } from './guardrails'
+import { ControlTower } from './control-tower'
+import { DetractorRecovery } from './detractor-recovery'
 import { FeedbackJourney } from './feedback-journey'
 import { NpsReporting } from './nps-reporting'
 import { RootCause } from './root-cause'
@@ -139,6 +141,10 @@ function Screen({ slug }: { slug: string }) {
       return <VocAnalyzer />
     case 'root-cause':
       return <RootCause />
+    case 'detractor-recovery':
+      return <DetractorRecovery />
+    case 'control-tower':
+      return <ControlTower />
     default: {
       const useCase = useCaseBySlug(slug)
       return (
