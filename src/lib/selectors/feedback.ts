@@ -706,16 +706,26 @@ export function selectInterventions(
     Sales: 'Sales',
   }
 
-  return clusters
+  /*
+   * Impact is normalised against the clusters actually present, not against an
+   * absolute scale. An earlier formula multiplied the NPS drag by two, and
+   * since every cluster drags between four and five points it produced 9 or 10
+   * for all of them — every dot piled into the top of the matrix and every
+   * backlog row came out "in flight". Volume is log-scaled so one very large
+   * cluster does not flatten the rest to zero.
+   */
+  const maxDrag = Math.max(...clusters.map((c) => Math.abs(c.npsDrag)), 1)
+  const maxVolume = Math.max(...clusters.map((c) => c.affectedResponses), 1)
+
+  const ranked = clusters
     .map((cluster, i) => {
       const aspect = THEME_DEFS_BY_ID[cluster.themeIds[0]]?.aspect ?? 'Service'
-      // Impact scales with how far the cluster drags NPS and how often it recurs.
+      const dragNorm = Math.abs(cluster.npsDrag) / maxDrag
+      const volumeNorm =
+        Math.log10(1 + cluster.affectedResponses) / Math.log10(1 + maxVolume)
       const impact = Math.max(
         1,
-        Math.min(
-          10,
-          Math.round(Math.abs(cluster.npsDrag) * 2 + cluster.repeatCount / 60),
-        ),
+        Math.min(10, Math.round(1 + 9 * (0.5 * dragNorm + 0.5 * volumeNorm))),
       )
 
       return {
@@ -725,11 +735,21 @@ export function selectInterventions(
         impact,
         effort: EFFORT[aspect] ?? 5,
         owner: OWNER[aspect] ?? 'Customer Care',
-        status:
-          impact >= 7 ? 'in-flight' : impact >= 5 ? 'planned' : ('backlog' as const),
-      } satisfies Intervention
+        aspect,
+      }
     })
     .sort((a, b) => b.impact - a.impact || a.effort - b.effort)
+
+  /*
+   * Status follows the ranking rather than an absolute impact threshold, so the
+   * backlog always shows a real mix. A fixed cut-off marked everything
+   * in-flight the moment the impact scores clustered.
+   */
+  return ranked.map((row, i) => ({
+    ...row,
+    status:
+      i < 2 ? 'in-flight' : i < 4 ? 'planned' : ('backlog' as const),
+  })) satisfies Intervention[]
 }
 
 /** Band counts for the Type 1 promoter/passive/detractor split chart. */

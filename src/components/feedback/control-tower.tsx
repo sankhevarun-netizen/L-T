@@ -195,20 +195,23 @@ export function ControlTower() {
               Deprioritise
             </span>
 
-            {interventions.map((intervention) => (
+            {/*
+              Numbered dots keyed to the backlog below, not text labels.
+              Labelling each point with its owner collided as soon as two
+              interventions sat near each other, and two of them read "Projects"
+              because one owner covers more than one aspect.
+            */}
+            {interventions.map((intervention, i) => (
               <div
                 key={intervention.id}
-                title={`${intervention.title} — impact ${intervention.impact}, effort ${intervention.effort}`}
-                className="absolute flex -translate-x-1/2 translate-y-1/2 items-center gap-1"
+                title={`${i + 1}. ${intervention.title} — impact ${intervention.impact}, effort ${intervention.effort} · ${intervention.owner}`}
+                className="absolute flex size-[22px] -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full bg-kpmg-blue text-[11px] font-bold text-white ring-2 ring-white"
                 style={{
-                  left: `${(intervention.effort / maxEffort) * 88 + 6}%`,
-                  bottom: `${(intervention.impact / maxImpact) * 82 + 8}%`,
+                  left: `${(intervention.effort / maxEffort) * 84 + 8}%`,
+                  bottom: `${(intervention.impact / maxImpact) * 76 + 10}%`,
                 }}
               >
-                <span className="size-2.5 shrink-0 rounded-full bg-kpmg-blue ring-2 ring-white" />
-                <span className="whitespace-nowrap rounded bg-white/90 px-1 text-[10px] font-medium text-slate-600">
-                  {intervention.owner}
-                </span>
+                {i + 1}
               </div>
             ))}
 
@@ -226,7 +229,7 @@ export function ControlTower() {
         </CardHeader>
         <CardContent className="p-0">
           <ul>
-            {interventions.map((intervention) => {
+            {interventions.map((intervention, i) => {
               const cluster = clusters.find(
                 (c) => c.id === intervention.clusterId,
               )
@@ -235,6 +238,10 @@ export function ControlTower() {
                   key={intervention.id}
                   className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0"
                 >
+                  {/* Matches the numbered dot on the matrix above. */}
+                  <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-kpmg-blue text-[11px] font-bold text-white">
+                    {i + 1}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[12.5px] font-semibold text-slate-900">
                       {intervention.title}
@@ -242,7 +249,7 @@ export function ControlTower() {
                     <p className="truncate text-[11px] text-slate-500">
                       {intervention.owner}
                       {cluster
-                        ? ` · ${formatNumber(cluster.affectedResponses)} responses · ${cluster.npsDrag} NPS`
+                        ? ` · ${formatNumber(cluster.affectedResponses)} complaints · ${cluster.npsDrag} NPS among them`
                         : ''}
                     </p>
                   </div>

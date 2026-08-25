@@ -65,9 +65,9 @@ export function RootCause() {
           accentBg="bg-kpmg-violet/10"
         />
         <StatTile
-          label="Responses affected"
+          label="Complaints clustered"
           value={formatNumber(totalAffected)}
-          sub={`of ${formatNumber(responses.length)} analysed`}
+          sub={`of ${formatNumber(responses.length)} responses analysed`}
           icon={Repeat}
         />
         <StatTile
@@ -195,7 +195,7 @@ export function RootCause() {
                     <p className="mt-0.5 text-[11px] text-slate-500">
                       {STAGE_LABEL[cluster.journeyStage]} ·{' '}
                       {TOUCHPOINT_LABEL[cluster.touchpoint]} ·{' '}
-                      {formatNumber(cluster.repeatCount)} repeat
+                      {formatNumber(cluster.repeatCount)} complaint
                       {cluster.repeatCount === 1 ? '' : 's'} ·{' '}
                       {cluster.projectIds.length} project
                       {cluster.projectIds.length === 1 ? '' : 's'}
@@ -219,7 +219,7 @@ export function RootCause() {
                 {[
                   { label: 'NPS drag', value: `${selected.npsDrag}` },
                   {
-                    label: 'Responses',
+                    label: 'Complaints',
                     value: formatNumber(selected.affectedResponses),
                   },
                   {

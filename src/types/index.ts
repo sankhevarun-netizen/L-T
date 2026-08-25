@@ -544,6 +544,8 @@ export interface Intervention {
   id: string
   title: string
   clusterId: string
+  /** Unique per cluster, unlike owner — used to label the matrix. */
+  aspect: string
   /** 1–10, both configured rather than inferred. */
   impact: number
   effort: number
