@@ -7,7 +7,9 @@ import { ComingSoon } from '@/components/layout/coming-soon'
 import { IllustrativeBanner } from './guardrails'
 import { FeedbackJourney } from './feedback-journey'
 import { NpsReporting } from './nps-reporting'
+import { RootCause } from './root-cause'
 import { SurveyOptimizer } from './survey-optimizer'
+import { VocAnalyzer } from './voc-analyzer'
 import {
   FEEDBACK_TYPE_META,
   USE_CASES,
@@ -133,6 +135,10 @@ function Screen({ slug }: { slug: string }) {
       return <SurveyOptimizer />
     case 'feedback-journey':
       return <FeedbackJourney />
+    case 'voc-analyzer':
+      return <VocAnalyzer />
+    case 'root-cause':
+      return <RootCause />
     default: {
       const useCase = useCaseBySlug(slug)
       return (
