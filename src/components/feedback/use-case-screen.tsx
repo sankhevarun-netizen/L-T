@@ -6,6 +6,7 @@ import { ArrowLeft, Sparkles } from 'lucide-react'
 import { ComingSoon } from '@/components/layout/coming-soon'
 import { IllustrativeBanner } from './guardrails'
 import { NpsReporting } from './nps-reporting'
+import { SurveyOptimizer } from './survey-optimizer'
 import {
   FEEDBACK_TYPE_META,
   USE_CASES,
@@ -127,6 +128,8 @@ function Screen({ slug }: { slug: string }) {
   switch (slug) {
     case 'nps-reporting':
       return <NpsReporting />
+    case 'survey-optimizer':
+      return <SurveyOptimizer />
     default: {
       const useCase = useCaseBySlug(slug)
       return (
