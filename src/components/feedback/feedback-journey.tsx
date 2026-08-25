@@ -141,7 +141,7 @@ export function FeedbackJourney() {
             <div className="flex items-center gap-2.5">
               <InitialsAvatar name={lead.name} />
               <div className="min-w-0">
-                <p className="truncate text-[13.5px] font-bold text-slate-900">
+                <p className="truncate text-[13px] font-bold text-slate-900">
                   {lead.name}
                 </p>
                 <p className="truncate text-[11.5px] text-slate-500">
@@ -162,7 +162,7 @@ export function FeedbackJourney() {
                     title={STAGE_LABEL[stage]}
                     className={cn(
                       'h-1.5 flex-1 rounded-full',
-                      i <= stageIndex ? 'bg-kpmg-blue' : 'bg-slate-150 bg-slate-100',
+                      i <= stageIndex ? 'bg-kpmg-blue' : 'bg-slate-100',
                     )}
                   />
                 ))}

@@ -26,19 +26,22 @@ export type NarrativeBeat = 'collect' | 'understand' | 'act'
 
 export const FEEDBACK_TYPE_META: Record<
   FeedbackType,
-  { label: string; blurb: string; caption: string }
+  { label: string; blurb: string; caption: string; accent: string }
 > = {
   'type-1': {
     label: 'Type 1 — Traditional CSAT & NPS Reporting',
     blurb:
       'Descriptive reporting. Answers what happened, and establishes the baseline.',
     caption: 'Minimal AI value addition',
+    // Slate rather than a brand accent: the plainness is the argument.
+    accent: 'text-slate-500',
   },
   'type-2': {
     label: 'Type 2 — AI-Powered Customer Feedback Intelligence',
     blurb:
       'Extends reporting into prediction, personalisation, diagnosis and action orchestration.',
     caption: 'Prediction · Diagnosis · Orchestration',
+    accent: 'text-kpmg-violet',
   },
 }
 
