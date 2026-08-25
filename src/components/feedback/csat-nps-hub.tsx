@@ -241,8 +241,14 @@ export function CsatNpsHub() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-rail-800 p-5 text-white shadow-card">
         <div className="min-w-0">
+          {/*
+            Not the page title again — the app header already renders that
+            directly above, and repeating it verbatim wasted the strongest line
+            on the screen. This names what the feature does instead, the way the
+            agent gallery's banner says "DICE Agent Layer" under "AI Insights".
+          */}
           <h2 className="text-[19px] font-bold tracking-[-0.01em]">
-            CSAT &amp; NPS Reporting
+            Customer Feedback Intelligence
           </h2>
           <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-white/60">
             Nine capabilities across two types. Traditional reporting says what
