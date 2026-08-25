@@ -5,6 +5,7 @@ import { ArrowLeft, Sparkles } from 'lucide-react'
 
 import { ComingSoon } from '@/components/layout/coming-soon'
 import { IllustrativeBanner } from './guardrails'
+import { FeedbackJourney } from './feedback-journey'
 import { NpsReporting } from './nps-reporting'
 import { SurveyOptimizer } from './survey-optimizer'
 import {
@@ -130,6 +131,8 @@ function Screen({ slug }: { slug: string }) {
       return <NpsReporting />
     case 'survey-optimizer':
       return <SurveyOptimizer />
+    case 'feedback-journey':
+      return <FeedbackJourney />
     default: {
       const useCase = useCaseBySlug(slug)
       return (
