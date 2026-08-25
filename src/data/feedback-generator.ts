@@ -269,7 +269,10 @@ export function buildFeedback(input: {
       const id = `inv-${lead.id}-${tIdx}`
       const propensity = propensityFor(rng, lead, fatigue)
       const channel = rng.pick(CHANNELS)
-      const daysAgo = rng.int(2, 120)
+      // Spans the full six-month trend window. At 120 days the two earliest
+      // buckets held no responses and the chart opened on a flat zero line,
+      // which reads as broken data rather than as a young feedback programme.
+      const daysAgo = rng.int(2, 178)
 
       // Restraint first: fatigue or DND means the invite is never sent.
       if (fatigue >= 3 || lead.dnd) {

@@ -379,6 +379,12 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       const updated: RecoveryCase = {
         ...existing,
         ...patch,
+        // Closing always stamps the demo clock, so a case closed live sits on
+        // the same timeline as every seeded one.
+        closedAt:
+          patch.status === 'closed'
+            ? (patch.closedAt ?? DEMO_NOW.toISOString())
+            : (patch.closedAt ?? existing.closedAt),
         timeline: note
           ? [
               ...existing.timeline,

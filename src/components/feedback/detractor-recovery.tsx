@@ -312,9 +312,12 @@ export function DetractorRecovery() {
                     className="flex-1"
                     disabled={active.existingCase.status === 'closed'}
                     onClick={() =>
+                      // The store stamps closedAt from DEMO_NOW. Passing a wall
+                      // clock here dated a closed case months away from every
+                      // other record on the same screen.
                       updateRecoveryCase(
                         active.existingCase!.id,
-                        { status: 'closed', closedAt: new Date().toISOString() },
+                        { status: 'closed' },
                         'Resolution confirmed with the customer.',
                       )
                     }

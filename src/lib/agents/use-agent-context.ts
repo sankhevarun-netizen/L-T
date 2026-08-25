@@ -4,6 +4,10 @@ import { useMemo } from 'react'
 
 import { CAMPAIGNS } from '@/data/reference'
 import { useAIService } from '@/lib/ai/use-ai-service'
+import {
+  selectRootCauseClusters,
+  selectThemes,
+} from '@/lib/selectors/feedback'
 import { useCrmStore } from '@/store/crm-store'
 import type { AgentContext } from './types'
 
@@ -22,8 +26,9 @@ export function useAgentContext(): AgentContext {
   const recoveryCases = useCrmStore((s) => s.recoveryCases)
   const ai = useAIService()
 
-  return useMemo(
-    () => ({
+  return useMemo(() => {
+    const feedbackThemes = selectThemes(surveyResponses)
+    return {
       leads,
       engagements,
       siteVisits,
@@ -36,9 +41,11 @@ export function useAgentContext(): AgentContext {
       surveyInvites,
       surveyResponses,
       recoveryCases,
+      feedbackThemes,
+      feedbackClusters: selectRootCauseClusters(surveyResponses, feedbackThemes),
       ai,
-    }),
-    [
+    }
+  }, [
       leads,
       engagements,
       siteVisits,
@@ -50,7 +57,6 @@ export function useAgentContext(): AgentContext {
       surveyInvites,
       surveyResponses,
       recoveryCases,
-      ai,
-    ],
-  )
+    ai,
+  ])
 }

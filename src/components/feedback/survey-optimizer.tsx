@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Ban, Clock, Send, TrendingUp } from 'lucide-react'
+import { Ban, CircleCheck, Clock, Send, TrendingUp } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -150,7 +150,16 @@ function QueueRow({
 export function SurveyOptimizer() {
   const { queue, propensityHeatmap } = useFeedbackData()
   const scheduleSurveyInvite = useCrmStore((s) => s.scheduleSurveyInvite)
-  const [scheduled, setScheduled] = useState<Record<string, boolean>>({})
+
+  /*
+   * Scheduling moves the invite out of the queue this list is derived from, so
+   * the row unmounts in the same update. Holding a session-local record of what
+   * was sent keeps the confirmation on screen — otherwise a click just makes a
+   * row disappear, which reads as a failure rather than a write.
+   */
+  const [sent, setSent] = useState<
+    { id: string; name: string; channel: string; window: string }[]
+  >([])
 
   const heatmapByTouchpoint = propensityHeatmap.reduce<
     Record<string, Record<string, number>>
@@ -203,19 +212,51 @@ export function SurveyOptimizer() {
             <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
+            {sent.length > 0 && (
+              <ul className="border-b border-emerald-100 bg-emerald-50/50">
+                {sent.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex items-center gap-2 px-4 py-2 text-[11.5px]"
+                  >
+                    <CircleCheck
+                      className="size-3.5 shrink-0 text-emerald-600"
+                      strokeWidth={2.2}
+                    />
+                    <span className="font-semibold text-slate-800">
+                      {row.name}
+                    </span>
+                    <span className="min-w-0 truncate text-slate-500">
+                      scheduled on {row.channel} · {row.window}
+                    </span>
+                    <span className="ml-auto shrink-0 text-[10.5px] font-semibold uppercase tracking-wider text-emerald-700">
+                      Written to CRM
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
             <ul>
               {queue.queued.slice(0, 12).map(({ invite, band }) => (
                 <QueueRow
                   key={invite.id}
                   invite={invite}
                   band={band}
-                  scheduled={Boolean(scheduled[invite.id])}
+                  scheduled={false}
                   onSchedule={() => {
                     scheduleSurveyInvite(
                       invite.id,
                       `Predicted response likelihood ${invite.responsePropensity}%`,
                     )
-                    setScheduled((s) => ({ ...s, [invite.id]: true }))
+                    setSent((rows) => [
+                      {
+                        id: invite.id,
+                        name: invite.customerName,
+                        channel: invite.channel,
+                        window: invite.recommendedWindow,
+                      },
+                      ...rows,
+                    ])
                   }}
                 />
               ))}

@@ -96,10 +96,20 @@ export function selectNpsTrend(responses: SurveyResponse[]): NpsTrendPoint[] {
   }))
 }
 
+/**
+ * Month bucket key, pinned to UTC.
+ *
+ * Without an explicit timeZone, toLocaleDateString formats in the viewer's
+ * local zone while these keys are built from UTC instants — so a viewer west
+ * of UTC bucketed May into "Apr'26" and disagreed with the server-rendered
+ * HTML, which is a hydration mismatch on a page whose premise is that the two
+ * generate identical data.
+ */
 function monthKey(d: Date) {
-  return `${d.toLocaleDateString('en-GB', { month: 'short' })}'${String(
-    d.getFullYear(),
-  ).slice(2)}`
+  return `${d.toLocaleDateString('en-GB', {
+    month: 'short',
+    timeZone: 'UTC',
+  })}'${String(d.getUTCFullYear()).slice(2)}`
 }
 
 export interface TouchpointCsat {
