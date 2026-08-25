@@ -179,7 +179,7 @@ const vocAnalyzerAgent = defineAgent({
   crmAction: 'Suggest a CRM tag against the response for review.',
 
   detectSync(ctx) {
-    const themes = selectThemes(ctx.surveyResponses)
+    const themes = ctx.feedbackThemes
 
     // Emerging first — a new issue is worth more attention than a known one.
     const ranked = [...themes].sort((a, b) => {
@@ -207,9 +207,8 @@ const vocAnalyzerAgent = defineAgent({
   },
 
   async recommendAction(findings, ctx) {
-    const themes = selectThemes(ctx.surveyResponses)
     return findings.map((f) => {
-      const theme = themes.find((t) => `voc-${t.id}` === f.id)
+      const theme = ctx.feedbackThemes.find((t) => `voc-${t.id}` === f.id)
       return plan(
         'agent-voc-analyzer',
         f,
@@ -247,10 +246,7 @@ const rootCauseAgent = defineAgent({
   crmAction: 'Raise a diagnostic task for the owning function.',
 
   detectSync(ctx) {
-    const themes = selectThemes(ctx.surveyResponses)
-    const clusters = selectRootCauseClusters(ctx.surveyResponses, themes)
-
-    return clusters.slice(0, MAX_FINDINGS).map((cluster) =>
+    return ctx.feedbackClusters.slice(0, MAX_FINDINGS).map((cluster) =>
       finding({
         id: `cause-${cluster.id}`,
         subjectName: cluster.label,
@@ -267,25 +263,30 @@ const rootCauseAgent = defineAgent({
   },
 
   async recommendAction(findings, ctx) {
-    const themes = selectThemes(ctx.surveyResponses)
-    const clusters = selectRootCauseClusters(ctx.surveyResponses, themes)
-
     return findings.map((f) => {
-      const cluster = clusters.find((c) => `cause-${c.id}` === f.id)
+      const cluster = ctx.feedbackClusters.find((c) => `cause-${c.id}` === f.id)
       const aspect = THEME_DEFS_BY_ID[cluster?.themeIds[0] ?? '']?.aspect ?? 'Service'
+      /*
+       * Logged against the cluster rather than raised as a Task.
+       *
+       * A cluster spans hundreds of customers and has no owning record, so a
+       * Task would need a whatId it does not have — passing the theme id put
+       * "thm-documentation" in the activity feed where a customer name belongs
+       * and produced a task no lead could ever see.
+       */
       return plan(
         'agent-root-cause',
         f,
         `Open a diagnostic review on ${aspect}`,
         'The pattern repeats across enough responses to be worth investigating, not merely logging.',
-        `Task created for the ${aspect} function with the affected response set attached`,
+        `Diagnostic review logged for the ${aspect} function · ${cluster?.affectedResponses ?? 0} responses attached`,
         {
-          kind: 'create-task',
-          leadId: cluster?.themeIds[0] ?? f.id,
-          subject: `Diagnostic review — ${f.subjectName}`,
-          ownerId: REPS[0].id,
-          dueInDays: 5,
-          priority: 'High',
+          kind: 'log-activity',
+          object: 'Activity',
+          recordId: cluster?.id ?? f.id,
+          recordName: `${aspect} — ${f.subjectName}`,
+          action: 'Diagnostic review opened',
+          detail: `${cluster?.affectedResponses ?? 0} responses, NPS drag ${cluster?.npsDrag ?? 0}. Association ${cluster?.correlation.toFixed(2) ?? '0'} requires business validation.`,
         },
       )
     })

@@ -2,7 +2,9 @@ import type { SeedCampaign } from '@/data/reference'
 import type { AIService } from '@/lib/ai'
 import type {
   Booking,
+  FeedbackTheme,
   RecoveryCase,
+  RootCauseCluster,
   Engagement,
   Lead,
   Payment,
@@ -96,6 +98,15 @@ export interface AgentContext {
   surveyInvites: SurveyInvite[]
   surveyResponses: SurveyResponse[]
   recoveryCases: RecoveryCase[]
+  /**
+   * Themes and clusters, derived once per context.
+   *
+   * Extraction walks every verbatim, and several agents need it in both
+   * detect and recommend. Recomputing per call meant a "Run all" pass rescanned
+   * the whole book about six times.
+   */
+  feedbackThemes: FeedbackTheme[]
+  feedbackClusters: RootCauseCluster[]
   ai: AIService
 }
 
