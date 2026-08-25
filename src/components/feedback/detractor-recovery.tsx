@@ -279,6 +279,54 @@ export function DetractorRecovery() {
                 </div>
               </div>
 
+              {/*
+                Case timeline and closure evidence.
+
+                Both were generated on every seeded case and shown nowhere. They
+                are what turns "we opened a case" into "here is what happened and
+                here is the proof it closed" — which is the whole closure
+                discipline argument.
+              */}
+              {active.existingCase && active.existingCase.timeline.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Case timeline
+                  </p>
+                  <ol className="mt-2 space-y-0">
+                    {active.existingCase.timeline.map((entry, i, all) => (
+                      <li key={i} className="flex gap-2.5">
+                        <div className="flex flex-col items-center">
+                          <span className="mt-1 size-2 shrink-0 rounded-full bg-kpmg-blue" />
+                          {i < all.length - 1 && (
+                            <span className="w-px flex-1 bg-slate-200" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1 pb-3">
+                          <p className="text-[12px] leading-snug text-slate-700">
+                            {entry.note}
+                          </p>
+                          <p className="mt-0.5 text-[10.5px] text-slate-400">
+                            {entry.actor} · {formatDate(entry.at)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {active.existingCase?.closureEvidence && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                  <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                    <CircleCheck className="size-3" />
+                    Closure evidence
+                  </p>
+                  <p className="mt-1 text-[12px] leading-snug text-slate-700">
+                    {active.existingCase.closureEvidence}
+                  </p>
+                </div>
+              )}
+
               <div className="border-t border-slate-100 pt-2.5">
                 <HumanReviewNote>
                   The draft is prepared for a person to review and send. The

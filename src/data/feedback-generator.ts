@@ -6,6 +6,7 @@ import {
   npsBandFor,
 } from './feedback'
 import { DEMO_NOW, PROJECTS, REPS } from './reference'
+import { mapLeadToPersonas } from '@/lib/personas/mapping'
 import { Rng } from './rng'
 import type {
   Booking,
@@ -174,6 +175,23 @@ export function buildFeedback(input: {
   const surveyInvites: SurveyInvite[] = []
   const surveyResponses: SurveyResponse[] = []
 
+  /*
+   * Persona per lead, resolved once.
+   *
+   * The persona engine already scores every lead; without stamping the winner
+   * onto the response, SurveyResponse.personaId stayed undefined forever and
+   * the persona half of the brief's "project/persona comparison" had no data
+   * behind it. Memoised because a lead can carry several responses and the
+   * mapper is a full rule pass over every persona.
+   */
+  const personaCache = new Map<string, string | undefined>()
+  function personaFor(lead: Lead) {
+    if (!personaCache.has(lead.id)) {
+      personaCache.set(lead.id, mapLeadToPersonas({ lead }).best.personaId)
+    }
+    return personaCache.get(lead.id)
+  }
+
   /**
    * The unresolved ticket that best explains a detractor score.
    *
@@ -242,6 +260,7 @@ export function buildFeedback(input: {
       customerName: lead.name,
       journeyStage: lead.stage,
       projectName: PROJECT_NAME[response.projectId] ?? 'Meridian',
+      personaId: response.personaId ?? personaFor(lead),
       npsBand: npsBandFor(response.npsScore),
       sourceTicketId:
         response.sourceTicketId ??
@@ -370,6 +389,7 @@ export function buildFeedback(input: {
         touchpoint,
         projectId,
         projectName: PROJECT_NAME[projectId] ?? 'Meridian',
+        personaId: personaFor(lead),
         journeyStage: lead.stage,
         npsScore,
         npsBand: npsBandFor(npsScore),

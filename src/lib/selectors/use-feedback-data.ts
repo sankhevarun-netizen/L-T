@@ -2,9 +2,12 @@
 
 import { useMemo } from 'react'
 
+import { PERSONAS_BY_ID } from '@/data/personas'
 import { useCrmStore } from '@/store/crm-store'
 import {
   selectCsatByTouchpoint,
+  selectCsatTrend,
+  selectIssueTrends,
   selectDrivers,
   selectInterventions,
   selectJourneyHeatmap,
@@ -14,7 +17,10 @@ import {
   selectRecoveryQueue,
   selectRecoverySummary,
   selectRootCauseClusters,
+  selectSatisfactionByPersona,
+  selectSatisfactionByProject,
   selectSentimentBreakdown,
+  selectWordFrequency,
   selectSurveyQueue,
   selectThemes,
 } from './feedback'
@@ -44,12 +50,21 @@ export function useFeedbackData() {
       nps: selectNpsSummary(surveyResponses),
       npsTrend: selectNpsTrend(surveyResponses),
       csatByTouchpoint: selectCsatByTouchpoint(surveyResponses),
+      csatTrend: selectCsatTrend(surveyResponses),
+      wordFrequency: selectWordFrequency(surveyResponses),
       sentiment: selectSentimentBreakdown(surveyResponses),
 
       /* Type 2 */
       themes,
       clusters,
       journeyHeatmap: selectJourneyHeatmap(surveyResponses),
+      byPersona: selectSatisfactionByPersona(
+        surveyResponses,
+        themes,
+        (id) => PERSONAS_BY_ID[id]?.shortName ?? id,
+      ),
+      byProject: selectSatisfactionByProject(surveyResponses, themes),
+      issueTrends: selectIssueTrends(surveyResponses, themes),
       queue: selectSurveyQueue(surveyInvites),
       propensityHeatmap: selectPropensityHeatmap(surveyInvites),
       recoveryQueue: selectRecoveryQueue(surveyResponses, recoveryCases),

@@ -122,6 +122,8 @@ export function isAtRisk(lead: Lead) {
 
 export interface KpiValues {
   totalLeads: number
+  /** Net Promoter Score across the feedback book. */
+  nps: number
   hotLeads: number
   siteVisits: number
   bookings: number
@@ -129,8 +131,13 @@ export interface KpiValues {
   revenueAtRiskCr: number
 }
 
-export function selectKpiValues(leads: Lead[], bookings: Booking[]): KpiValues {
+export function selectKpiValues(
+  leads: Lead[],
+  bookings: Booking[],
+  nps = 0,
+): KpiValues {
   return {
+    nps,
     totalLeads: leads.length,
     hotLeads: leads.filter((l) => l.intent === 'high').length,
     siteVisits: leads.filter((l) => REACH.siteVisit.includes(l.stage)).length,
@@ -145,6 +152,9 @@ export function selectKpiValues(leads: Lead[], bookings: Booking[]): KpiValues {
 /** Month-on-month deltas are stored rather than derived — a current-state
  *  snapshot cannot recompute what last month looked like. */
 export const KPI_DELTAS = {
+  // Matches the monthly trend the feedback book actually produces: 31 in April
+  // down to 28 in May. Satisfaction is declining, and the tile says so.
+  nps: -3,
   totalLeads: 18,
   hotLeads: 12,
   siteVisits: 11,

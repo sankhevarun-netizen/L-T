@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Layers, Repeat, TrendingDown } from 'lucide-react'
+import { Layers, Loader2, Repeat, Sparkles, TrendingDown } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
@@ -10,7 +10,10 @@ import {
   EvidenceList,
   IllustrativeBadge,
 } from './guardrails'
+import { Button } from '@/components/ui/button'
+import { useAIService } from '@/lib/ai/use-ai-service'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
+import type { AIRootCauseResult } from '@/lib/ai'
 import { formatNumber } from '@/lib/format'
 import { STAGE_ORDER, TOUCHPOINT_LABEL, TOUCHPOINT_ORDER } from '@/types'
 import type { JourneyStage, TouchpointId } from '@/types'
@@ -37,8 +40,21 @@ const STAGE_LABEL: Record<JourneyStage, string> = {
 }
 
 export function RootCause() {
-  const { clusters, journeyHeatmap, responses } = useFeedbackData()
+  const { clusters, journeyHeatmap, responses, byPersona, byProject, issueTrends } =
+    useFeedbackData()
   const [selectedId, setSelectedId] = useState(clusters[0]?.id ?? '')
+
+  /*
+   * The AI narrative layer, on demand.
+   *
+   * The clusters themselves are a deterministic rule pass and never change. This
+   * asks the model to phrase a HYPOTHESIS over them and name what would have to
+   * be checked — which is the one thing a rule pass cannot do, and the reason
+   * the live AI mode exists at all.
+   */
+  const ai = useAIService()
+  const [explanation, setExplanation] = useState<AIRootCauseResult | null>(null)
+  const [explaining, setExplaining] = useState(false)
 
   const selected = clusters.find((c) => c.id === selectedId) ?? clusters[0]
 
@@ -164,6 +180,182 @@ export function RootCause() {
         </CardContent>
       </Card>
 
+      {/*
+        Segment comparison.
+
+        The brief asks Root Cause for a project and persona comparison. Persona
+        is the more actionable half: a developer can change how it sells to a
+        segment far faster than it can change a delivered project.
+      */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>Satisfaction by buyer persona</CardTitle>
+            <IllustrativeBadge />
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul>
+              {byPersona.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12.5px] font-semibold text-slate-900">
+                      {row.label}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {formatNumber(row.responses)} responses
+                      {row.topComplaint ? ` · worst on ${row.topComplaint}` : ''}
+                    </p>
+                  </div>
+                  <span className="nums shrink-0 text-[11.5px] text-slate-500">
+                    {row.detractorPct}% detr.
+                  </span>
+                  <span
+                    className={cn(
+                      'nums shrink-0 rounded-md px-1.5 py-0.5 text-[12px] font-bold',
+                      row.nps < 20
+                        ? 'bg-red-50 text-red-700'
+                        : 'bg-slate-100 text-slate-700',
+                    )}
+                  >
+                    {row.nps > 0 ? '+' : ''}
+                    {row.nps}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader>
+            <CardTitle>Satisfaction by project</CardTitle>
+            <IllustrativeBadge />
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul>
+              {byProject.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12.5px] font-semibold text-slate-900">
+                      {row.label}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {formatNumber(row.responses)} responses
+                      {row.topComplaint ? ` · worst on ${row.topComplaint}` : ''}
+                    </p>
+                  </div>
+                  <span className="nums shrink-0 text-[11.5px] text-slate-500">
+                    CSAT {row.csat}
+                  </span>
+                  <span
+                    className={cn(
+                      'nums shrink-0 rounded-md px-1.5 py-0.5 text-[12px] font-bold',
+                      row.nps < 20
+                        ? 'bg-red-50 text-red-700'
+                        : 'bg-slate-100 text-slate-700',
+                    )}
+                  >
+                    {row.nps > 0 ? '+' : ''}
+                    {row.nps}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/*
+        Repeat-issue trend.
+
+        Complaint volume per theme, month by month. A count says an issue is
+        common; only the direction of travel says whether anything is working.
+      */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Repeat-issue trend</CardTitle>
+          <span className="text-[10.5px] font-medium text-slate-400">
+            Complaints per month, worsening first
+          </span>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="overflow-x-auto scrollbar-slim">
+            <table className="w-full min-w-[520px]">
+              <thead>
+                <tr>
+                  <th className="pb-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Issue
+                  </th>
+                  {(issueTrends[0]?.points ?? []).map((pt) => (
+                    <th
+                      key={pt.month}
+                      className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-400"
+                    >
+                      {pt.month}
+                    </th>
+                  ))}
+                  <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Change
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {issueTrends.map((series) => {
+                  const peak = Math.max(
+                    ...series.points.map((pt) => pt.mentions),
+                    1,
+                  )
+                  return (
+                    <tr key={series.themeId}>
+                      <td className="py-1.5 pr-3 text-[12px] text-slate-700">
+                        {series.label}
+                      </td>
+                      {series.points.map((pt) => (
+                        <td key={pt.month} className="py-1.5 pl-1.5">
+                          <div
+                            className="rounded-md py-1 text-center"
+                            style={{
+                              backgroundColor: `rgba(220, 38, 38, ${
+                                0.05 + (pt.mentions / peak) * 0.35
+                              })`,
+                            }}
+                          >
+                            <span className="nums text-[11.5px] font-semibold text-slate-800">
+                              {pt.mentions}
+                            </span>
+                          </div>
+                        </td>
+                      ))}
+                      <td className="py-1.5 pl-2 text-right">
+                        <span
+                          className={cn(
+                            'nums text-[12px] font-bold',
+                            series.change > 0
+                              ? 'text-red-600'
+                              : series.change < 0
+                                ? 'text-kpmg-teal'
+                                : 'text-slate-400',
+                          )}
+                        >
+                          {series.change > 0 ? '+' : ''}
+                          {series.change}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Clusters */}
         <Card className="flex min-w-0 flex-col">
@@ -176,7 +368,10 @@ export function RootCause() {
                 <li key={cluster.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(cluster.id)}
+                    onClick={() => {
+                      setSelectedId(cluster.id)
+                      setExplanation(null)
+                    }}
                     className={cn(
                       'w-full border-b border-slate-100 px-4 py-2.5 text-left transition-colors last:border-0',
                       cluster.id === selected?.id
@@ -242,6 +437,76 @@ export function RootCause() {
               </div>
 
               <CorrelationNote value={selected.correlation} />
+
+              {explanation ? (
+                <div className="rounded-lg border border-kpmg-violet/25 bg-kpmg-violet/[0.04] px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-kpmg-violet">
+                      <Sparkles className="size-3" />
+                      Hypothesis
+                    </p>
+                    <span className="nums text-[10.5px] font-semibold text-slate-400">
+                      {explanation.confidence}% confidence
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-[12px] leading-relaxed text-slate-700">
+                    {explanation.hypothesis}
+                  </p>
+                  {explanation.correlates.length > 0 && (
+                    <>
+                      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Validate before treating as a cause
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {explanation.correlates.map((c, i) => (
+                          <li key={i} className="flex gap-1.5">
+                            <span className="mt-[7px] size-1 shrink-0 rounded-full bg-slate-400" />
+                            <span className="text-[11.5px] leading-snug text-slate-600">
+                              {c}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={explaining}
+                  onClick={async () => {
+                    setExplaining(true)
+                    try {
+                      setExplanation(
+                        await ai.explainRootCause({
+                          theme: selected.label,
+                          journeyStage: STAGE_LABEL[selected.journeyStage],
+                          touchpoint: TOUCHPOINT_LABEL[selected.touchpoint],
+                          affectedResponses: selected.affectedResponses,
+                          npsDrag: selected.npsDrag,
+                          correlation: selected.correlation,
+                          evidence: selected.evidence,
+                        }),
+                      )
+                    } finally {
+                      setExplaining(false)
+                    }
+                  }}
+                >
+                  {explaining ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      Reasoning...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles />
+                      Explain this cluster
+                    </>
+                  )}
+                </Button>
+              )}
 
               <EvidenceList
                 spans={selected.evidence}

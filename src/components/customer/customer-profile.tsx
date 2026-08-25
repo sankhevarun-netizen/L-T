@@ -8,6 +8,8 @@ import {
   CircleAlert,
   CircleCheck,
   Globe,
+  Gauge,
+  LifeBuoy,
   Lightbulb,
   Mail,
   MapPin,
@@ -26,8 +28,11 @@ import { PERSONAS_BY_ID } from '@/data/personas'
 import { PROJECTS, REPS } from '@/data/reference'
 import { agentforceVsDice } from '@/lib/crm'
 import { usePersonaFor } from '@/lib/personas/use-persona-map'
+import { selectThemesForResponse } from '@/lib/selectors/feedback'
+import { useFeedbackData, useFeedbackForLead } from '@/lib/selectors/use-feedback-data'
 import { nextBestActionFor, weightedValueCr } from '@/lib/selectors/overview'
 import { useCrmStore } from '@/store/crm-store'
+import { TOUCHPOINT_LABEL } from '@/types'
 import { formatCrore, formatDate } from '@/lib/format'
 import { STAGE_ORDER, type EngagementChannel, type Sentiment } from '@/types'
 import { cn } from '@/lib/utils'
@@ -55,6 +60,8 @@ const MILESTONES = [
 ] as const
 
 export function CustomerProfile({ leadId }: { leadId: string }) {
+  const feedback = useFeedbackForLead(leadId)
+  const { themes } = useFeedbackData()
   const lead = useCrmStore((s) => s.leadsById[leadId])
   const allEngagements = useCrmStore((s) => s.engagements)
   const allVisits = useCrmStore((s) => s.siteVisits)
@@ -411,6 +418,97 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
                 </>
               )}
             </Card>
+
+            {/*
+              Feedback on the 360.
+              The story used to take four screens — the lead record here, the
+              breaching ticket on Service Tickets, the score on the VoC Analyzer
+              and the case on Recovery. This is the same customer, so it belongs
+              on the same page.
+            */}
+            {feedback.latest && (
+              <Card className="p-5">
+                <h3 className="section-title">Customer satisfaction</h3>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                  <span
+                    className={cn(
+                      'nums rounded-md px-2.5 py-1 text-[15px] font-bold',
+                      feedback.latest.npsBand === 'promoter'
+                        ? 'bg-kpmg-teal/10 text-kpmg-teal'
+                        : feedback.latest.npsBand === 'passive'
+                          ? 'bg-slate-100 text-slate-600'
+                          : 'bg-red-50 text-red-700',
+                    )}
+                  >
+                    NPS {feedback.latest.npsScore}/10
+                  </span>
+                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[12px] font-semibold capitalize text-slate-600">
+                    {feedback.latest.npsBand}
+                  </span>
+                  <span className="text-[12.5px] text-slate-500">
+                    {TOUCHPOINT_LABEL[feedback.latest.touchpoint]} · CSAT{' '}
+                    {feedback.latest.csatScore}/5
+                  </span>
+                </div>
+
+                <blockquote className="mt-3 rounded-lg border-l-[3px] border-slate-300 bg-slate-50 py-2 pl-3 pr-3 text-[12.5px] italic leading-relaxed text-slate-600">
+                  {feedback.latest.verbatim}
+                </blockquote>
+
+                {/* Themes quote this record, not the book. */}
+                <div className="mt-3 space-y-1.5">
+                  {selectThemesForResponse(feedback.latest, themes).map((theme) => (
+                    <div
+                      key={theme.id}
+                      className="flex items-start justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5"
+                    >
+                      <p className="min-w-0 text-[12px] font-semibold text-slate-800">
+                        {theme.label}
+                      </p>
+                      <span className="nums shrink-0 text-[11px] font-semibold text-slate-500">
+                        {theme.confidence}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {feedback.latest.sourceTicketId && (
+                  <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11.5px] leading-relaxed text-slate-600">
+                    An unresolved service ticket (
+                    <code className="text-[11px] font-semibold text-slate-700">
+                      {feedback.latest.sourceTicketId}
+                    </code>
+                    ) was already open when this score was given.
+                  </p>
+                )}
+
+                {feedback.cases.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-kpmg-magenta/25 bg-kpmg-magenta/[0.04] px-3 py-2.5">
+                    <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-kpmg-magenta">
+                      <LifeBuoy className="size-3" />
+                      Recovery case
+                    </p>
+                    <p className="mt-1 text-[12.5px] font-semibold capitalize text-slate-800">
+                      {feedback.cases[0].status} ·{' '}
+                      {REPS.find((r) => r.id === feedback.cases[0].ownerId)?.name ??
+                        'Customer Care'}
+                    </p>
+                    <p className="mt-0.5 text-[11.5px] leading-snug text-slate-500">
+                      {feedback.cases[0].recommendedResponse}
+                    </p>
+                  </div>
+                )}
+
+                <Link
+                  href="/csat-nps/detractor-recovery"
+                  className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-semibold text-kpmg-blue hover:text-kpmg-navy"
+                >
+                  <Gauge className="size-3.5" />
+                  Open in CSAT &amp; NPS
+                </Link>
+              </Card>
+            )}
 
             <Card className="p-5">
               <h3 className="section-title">Persona fit</h3>

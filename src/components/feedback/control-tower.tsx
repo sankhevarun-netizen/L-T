@@ -76,7 +76,7 @@ function DriverRow({
 }
 
 export function ControlTower() {
-  const { drivers, interventions, recovery, nps, npsTrend, clusters } =
+  const { drivers, interventions, recovery, nps, npsTrend, clusters, issueTrends } =
     useFeedbackData()
 
   const previous = npsTrend.filter((p) => p.responses > 0).slice(-2)[0]
@@ -168,6 +168,68 @@ export function ControlTower() {
           </CardContent>
         </Card>
       </div>
+
+      {/*
+        Issue trends.
+
+        The drivers panels say what is hurting now. This says whether it is
+        getting better or worse, which is the only version a board can act on.
+      */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Issue trends</CardTitle>
+          <span className="text-[10.5px] font-medium text-slate-400">
+            Complaints per month · worsening first
+          </span>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <ul className="space-y-2.5">
+            {issueTrends.map((series) => {
+              const peak = Math.max(...series.points.map((pt) => pt.mentions), 1)
+              return (
+                <li key={series.themeId} className="flex items-center gap-3">
+                  <span className="w-[168px] shrink-0 truncate text-[12px] text-slate-700">
+                    {series.label}
+                  </span>
+
+                  {/* Sparkline: bars share one scale, endpoint emphasised. */}
+                  <span className="flex h-8 min-w-0 flex-1 items-end gap-[3px]">
+                    {series.points.map((pt, i) => (
+                      <span
+                        key={pt.month}
+                        title={`${pt.month} — ${pt.mentions} complaints`}
+                        className={cn(
+                          'min-w-0 flex-1 rounded-sm',
+                          i === series.points.length - 1
+                            ? 'bg-kpmg-blue'
+                            : 'bg-slate-200',
+                        )}
+                        style={{
+                          height: `${Math.max(6, (pt.mentions / peak) * 100)}%`,
+                        }}
+                      />
+                    ))}
+                  </span>
+
+                  <span
+                    className={cn(
+                      'nums w-[42px] shrink-0 text-right text-[12px] font-bold',
+                      series.change > 0
+                        ? 'text-red-600'
+                        : series.change < 0
+                          ? 'text-kpmg-teal'
+                          : 'text-slate-400',
+                    )}
+                  >
+                    {series.change > 0 ? '+' : ''}
+                    {series.change}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </CardContent>
+      </Card>
 
       {/* Impact-effort matrix */}
       <Card>

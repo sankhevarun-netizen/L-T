@@ -152,8 +152,15 @@ function SectionHead({
 }
 
 export function NpsReporting() {
-  const { nps, npsTrend, csatByTouchpoint, sentiment, responses } =
-    useFeedbackData()
+  const {
+    nps,
+    npsTrend,
+    csatTrend,
+    csatByTouchpoint,
+    sentiment,
+    responses,
+    wordFrequency,
+  } = useFeedbackData()
 
   const [mounted, setMounted] = useState(false)
   const [trendView, setTrendView] = useState<'chart' | 'table'>('chart')
@@ -183,6 +190,27 @@ export function NpsReporting() {
       responses: row.total,
     }))
     .sort((a, b) => b.nps - a.nps)
+
+  const byProjectCsat = Object.values(
+    responses.reduce<Record<string, { project: string; sum: number; n: number }>>(
+      (acc, r) => {
+        const row = (acc[r.projectId] ??= {
+          project: r.projectName.replace('Meridian ', ''),
+          sum: 0,
+          n: 0,
+        })
+        row.sum += r.csatScore
+        row.n += 1
+        return acc
+      },
+      {},
+    ),
+  )
+    .map((row) => ({
+      project: row.project,
+      csat: Math.round((row.sum / row.n) * 100) / 100,
+    }))
+    .sort((a, b) => b.csat - a.csat)
 
   const sentimentRows = [
     { label: 'Positive', value: sentiment.positive, color: PROMOTER },
@@ -428,6 +456,82 @@ export function NpsReporting() {
             )}
           </CardContent>
         </Card>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {/* One series, so the title names it and there is no legend box. */}
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>CSAT trend</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 pb-4">
+              <div className="h-[180px]">
+                {mounted && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={csatTrend}
+                      margin={{ top: 8, right: 12, bottom: 0, left: -22 }}
+                    >
+                      <CartesianGrid stroke="#F1F5F9" vertical={false} />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 11, fill: '#94A3B8' }}
+                      />
+                      <YAxis
+                        domain={[0, 5]}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 11, fill: '#94A3B8' }}
+                      />
+                      <Tooltip
+                        content={<PlainTooltip suffix=" / 5" />}
+                        cursor={{ stroke: '#CBD5E1' }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="csat"
+                        stroke={NEUTRAL}
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: NEUTRAL, strokeWidth: 0 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>CSAT by project</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <ul className="space-y-2">
+                {byProjectCsat.map((row) => (
+                  <li key={row.project} className="flex items-center gap-3">
+                    <span className="w-[110px] shrink-0 truncate text-[12px] text-slate-600">
+                      {row.project}
+                    </span>
+                    <div className="h-2.5 min-w-0 flex-1 rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.max(2, (row.csat / 5) * 100)}%`,
+                          backgroundColor: NEUTRAL,
+                        }}
+                      />
+                    </div>
+                    <span className="nums w-[46px] shrink-0 text-right text-[12px] font-semibold text-slate-700">
+                      {row.csat}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
       </section>
 
       {/* ============ 3. Feedback Sentiment Reporting ============ */}
@@ -514,6 +618,53 @@ export function NpsReporting() {
           </Card>
         </div>
       </section>
+
+      {/*
+        Word cloud.
+
+        Deliberately included, and deliberately last. A word cloud encodes by
+        area, which people read poorly, and mistakes frequency for importance,
+        so it is a weak visual by any modern standard. That is exactly why it
+        belongs here: it is what descriptive reporting produces when asked to
+        summarise open text, and showing it makes the ceiling visible rather
+        than merely asserted.
+      */}
+      <Card className="flex flex-col">
+        <CardHeader>
+          <CardTitle>Word frequency</CardTitle>
+          <span className="text-[10.5px] font-medium text-slate-400">
+            Most common words across {formatNumber(responses.length)} comments
+          </span>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
+            {wordFrequency.map((w) => {
+              const max = wordFrequency[0]?.count || 1
+              const scale = w.count / max
+              return (
+                <span
+                  key={w.word}
+                  title={`${w.word} - ${formatNumber(w.count)} mentions`}
+                  className="leading-none"
+                  style={{
+                    fontSize: `${12 + scale * 20}px`,
+                    fontWeight: scale > 0.55 ? 700 : 500,
+                    color: `rgba(71, 85, 105, ${0.5 + scale * 0.5})`,
+                  }}
+                >
+                  {w.word}
+                </span>
+              )
+            })}
+          </div>
+          <p className="mt-4 border-t border-slate-100 pt-3 text-[11.5px] leading-relaxed text-slate-500">
+            This is the ceiling of summarising open text by counting it. It shows
+            which words appeared most. It cannot tell you that hundreds of those
+            mentions share one root cause, which customer said them, or what to
+            do next.
+          </p>
+        </CardContent>
+      </Card>
 
       {/*
         The ceiling, stated on the screen itself. Everything above answers "what

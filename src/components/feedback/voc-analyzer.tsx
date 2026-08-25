@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { CornerDownRight, Sparkles, Tag, TrendingUp } from 'lucide-react'
+import { CornerDownRight, Loader2, Sparkles, Tag, TrendingUp } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
@@ -9,6 +9,8 @@ import { SentimentPill } from '@/components/shared/pills'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { ConfidencePill, EvidenceList, IllustrativeBadge } from './guardrails'
 import { selectThemesForResponse } from '@/lib/selectors/feedback'
+import { Button } from '@/components/ui/button'
+import { useAIService } from '@/lib/ai/use-ai-service'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
 import { formatNumber } from '@/lib/format'
 import { TOUCHPOINT_LABEL } from '@/types'
@@ -83,6 +85,17 @@ function ThemeRow({
 export function VocAnalyzer() {
   const { themes, responses } = useFeedbackData()
   const [selectedId, setSelectedId] = useState(themes[0]?.id ?? '')
+
+  /*
+   * Batch summary from the AI service.
+   *
+   * The themes are extracted deterministically and are not up for negotiation.
+   * This asks the model to read the same batch and say what it amounts to in a
+   * sentence, which is the narrative layer the rule pass has no way to produce.
+   */
+  const ai = useAIService()
+  const [summary, setSummary] = useState('')
+  const [summarising, setSummarising] = useState(false)
   const [responseId, setResponseId] = useState<string>('')
 
   /* Parents first, each followed by its sub-themes — the hierarchy view. */
@@ -173,6 +186,52 @@ export function VocAnalyzer() {
             <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
+            <div className="border-b border-slate-100 px-4 py-2.5">
+              {summary ? (
+                <p className="flex gap-2 text-[12px] leading-relaxed text-slate-600">
+                  <Sparkles
+                    className="mt-0.5 size-3.5 shrink-0 text-kpmg-violet"
+                    strokeWidth={2.2}
+                  />
+                  <span>{summary}</span>
+                </p>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={summarising}
+                  onClick={async () => {
+                    setSummarising(true)
+                    try {
+                      // A readable sample, not the whole book: the point is the
+                      // narrative, and 3,000 verbatims is not a prompt.
+                      const batch = responses
+                        .filter((r) => r.sentiment === 'negative')
+                        .slice(0, 40)
+                        .map((r) => r.verbatim)
+                      const result = await ai.extractThemes(batch, {
+                        screen: 'voc-analyzer',
+                      })
+                      setSummary(result.summary)
+                    } finally {
+                      setSummarising(false)
+                    }
+                  }}
+                >
+                  {summarising ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      Reading the batch...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles />
+                      Summarise what these amount to
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
             <ul>
               {ordered.map(({ theme, isChild }) => (
                 <ThemeRow

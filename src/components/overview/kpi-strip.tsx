@@ -1,5 +1,6 @@
 import {
   CalendarCheck,
+  Gauge,
   CircleAlert,
   Flame,
   MapPin,
@@ -26,6 +27,14 @@ interface TileConfig {
 }
 
 const TILES: TileConfig[] = [
+  {
+    key: 'nps',
+    label: 'Net Promoter Score',
+    icon: Gauge,
+    accent: 'text-kpmg-teal',
+    accentBg: 'bg-kpmg-teal/10',
+    format: (v) => `${v > 0 ? '+' : ''}${v}`,
+  },
   {
     key: 'totalLeads',
     label: 'Total Leads',

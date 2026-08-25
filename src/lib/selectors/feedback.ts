@@ -112,6 +112,128 @@ function monthKey(d: Date) {
   })}'${String(d.getUTCFullYear()).slice(2)}`
 }
 
+/**
+ * The six trailing month keys, and a bucketer that uses them.
+ *
+ * Three separate trends need the same window and the same UTC-pinned keys; a
+ * second implementation would drift from the first the moment either changed.
+ */
+function monthWindow() {
+  const keys: string[] = []
+  for (let i = 5; i >= 0; i--) {
+    keys.push(
+      monthKey(
+        new Date(
+          Date.UTC(DEMO_NOW.getUTCFullYear(), DEMO_NOW.getUTCMonth() - i, 1),
+        ),
+      ),
+    )
+  }
+  return keys
+}
+
+function bucketByMonth<T>(rows: T[], at: (row: T) => string) {
+  const buckets = new Map<string, T[]>(monthWindow().map((k) => [k, []]))
+  for (const row of rows) buckets.get(monthKey(new Date(at(row))))?.push(row)
+  return buckets
+}
+
+export interface CsatTrendPoint {
+  month: string
+  csat: number
+  responses: number
+}
+
+/** CSAT over the trailing six months — the brief's "CSAT trend dashboard". */
+export function selectCsatTrend(responses: SurveyResponse[]): CsatTrendPoint[] {
+  return [...bucketByMonth(responses, (r) => r.respondedAt).entries()].map(
+    ([month, rows]) => ({
+      month,
+      csat: rows.length
+        ? Math.round((rows.reduce((s, r) => s + r.csatScore, 0) / rows.length) * 100) / 100
+        : 0,
+      responses: rows.length,
+    }),
+  )
+}
+
+export interface IssueTrendSeries {
+  themeId: string
+  label: string
+  aspect: string
+  points: { month: string; mentions: number }[]
+  /** Mentions in the latest month minus the first — the direction of travel. */
+  change: number
+}
+
+/**
+ * Complaint volume per theme, month by month.
+ *
+ * Backs both the brief's "repeat-issue trend" on Root Cause and its "issue
+ * trends" on the Control Tower — the same series, read for different purposes:
+ * is this recurring, and is it getting worse.
+ */
+export function selectIssueTrends(
+  responses: SurveyResponse[],
+  themes: FeedbackTheme[],
+  limit = 5,
+): IssueTrendSeries[] {
+  const responsesById = new Map(responses.map((r) => [r.id, r]))
+  const months = monthWindow()
+
+  return themes
+    .filter((t) => t.sentiment !== 'positive' && t.mentions >= MIN_CLUSTER_RESPONSES)
+    .map((theme) => {
+      // Complaints only — a theme's total volume tracks survey volume, not pain.
+      const rows = theme.responseIds
+        .map((id) => responsesById.get(id))
+        .filter((r): r is SurveyResponse => Boolean(r) && r!.sentiment === 'negative')
+
+      const buckets = bucketByMonth(rows, (r) => r.respondedAt)
+      const points = months.map((month) => ({
+        month,
+        mentions: buckets.get(month)?.length ?? 0,
+      }))
+
+      return {
+        themeId: theme.id,
+        label: theme.label,
+        aspect: theme.aspect,
+        points,
+        change: points[points.length - 1].mentions - points[0].mentions,
+      }
+    })
+    .sort((a, b) => b.change - a.change)
+    .slice(0, limit)
+}
+
+/** Word frequency across every verbatim — the Traditional screen's ceiling. */
+export function selectWordFrequency(
+  responses: SurveyResponse[],
+  limit = 28,
+): { word: string; count: number }[] {
+  const STOP = new Set(
+    ('the a an and or but of to in on at for with was were is are be been i we my our you your it its ' +
+      'that this they them he she has have had do did not no so as from by up out if then than very ' +
+      'me us me about after before all any been because been more most other some such only own same ' +
+      'too can will just should now')
+      .split(' '),
+  )
+
+  const counts = new Map<string, number>()
+  for (const response of responses) {
+    for (const raw of response.verbatim.toLowerCase().split(/[^a-z]+/)) {
+      if (raw.length < 4 || STOP.has(raw)) continue
+      counts.set(raw, (counts.get(raw) ?? 0) + 1)
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+}
+
 export interface TouchpointCsat {
   touchpoint: TouchpointId
   label: string
@@ -750,6 +872,103 @@ export function selectInterventions(
     status:
       i < 2 ? 'in-flight' : i < 4 ? 'planned' : ('backlog' as const),
   })) satisfies Intervention[]
+}
+
+/* ------------------------------------------------------------------ */
+/* Segment comparison                                                  */
+/* ------------------------------------------------------------------ */
+
+export interface SegmentSatisfaction {
+  id: string
+  label: string
+  responses: number
+  nps: number
+  csat: number
+  detractorPct: number
+  /** The aspect this segment complains about most, or an empty string. */
+  topComplaint: string
+}
+
+function summariseSegment(
+  id: string,
+  label: string,
+  rows: SurveyResponse[],
+  themes: FeedbackTheme[],
+): SegmentSatisfaction {
+  const ids = new Set(rows.map((r) => r.id))
+  const negative = rows.filter((r) => r.sentiment === 'negative')
+
+  // Which aspect this segment complains about more than any other.
+  let topComplaint = ''
+  let best = 0
+  for (const theme of themes) {
+    if (theme.sentiment === 'positive') continue
+    const hits = theme.responseIds.filter((rid) => ids.has(rid)).length
+    if (hits > best) {
+      best = hits
+      topComplaint = theme.aspect
+    }
+  }
+
+  return {
+    id,
+    label,
+    responses: rows.length,
+    nps: selectNpsSummary(rows).nps,
+    csat: rows.length
+      ? Math.round((rows.reduce((s, r) => s + r.csatScore, 0) / rows.length) * 100) / 100
+      : 0,
+    detractorPct: rows.length
+      ? Math.round((rows.filter((r) => r.npsBand === 'detractor').length / rows.length) * 1000) / 10
+      : 0,
+    topComplaint: negative.length ? topComplaint : '',
+  }
+}
+
+/**
+ * Satisfaction by buyer persona.
+ *
+ * The brief asks Root Cause for a project and persona comparison. Persona is the
+ * more actionable half: a developer can change how it sells to a segment far
+ * faster than it can change a delivered project.
+ */
+export function selectSatisfactionByPersona(
+  responses: SurveyResponse[],
+  themes: FeedbackTheme[],
+  personaLabel: (id: string) => string,
+): SegmentSatisfaction[] {
+  const groups = new Map<string, SurveyResponse[]>()
+  for (const response of responses) {
+    if (!response.personaId) continue
+    const list = groups.get(response.personaId)
+    if (list) list.push(response)
+    else groups.set(response.personaId, [response])
+  }
+
+  return [...groups.entries()]
+    .map(([id, rows]) => summariseSegment(id, personaLabel(id), rows, themes))
+    .filter((row) => row.responses >= MIN_CLUSTER_RESPONSES)
+    .sort((a, b) => a.nps - b.nps)
+}
+
+/** Satisfaction by project — the other half of the comparison. */
+export function selectSatisfactionByProject(
+  responses: SurveyResponse[],
+  themes: FeedbackTheme[],
+): SegmentSatisfaction[] {
+  const groups = new Map<string, SurveyResponse[]>()
+  for (const response of responses) {
+    const list = groups.get(response.projectId)
+    if (list) list.push(response)
+    else groups.set(response.projectId, [response])
+  }
+
+  return [...groups.entries()]
+    .map(([id, rows]) =>
+      summariseSegment(id, rows[0].projectName.replace('Meridian ', ''), rows, themes),
+    )
+    .filter((row) => row.responses >= MIN_CLUSTER_RESPONSES)
+    .sort((a, b) => a.nps - b.nps)
 }
 
 /** Band counts for the Type 1 promoter/passive/detractor split chart. */

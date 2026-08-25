@@ -106,6 +106,14 @@ export interface CrmState {
   ) => void
   scheduleSurveyInvite: (inviteId: string, reason: string) => void
   suppressSurveyInvite: (inviteId: string, reason: string) => void
+  /**
+   * Resolves a post-sales ticket.
+   *
+   * Tickets were immutable, so the loop the platform is built to close could
+   * never actually be closed: it flagged that advocacy was at risk and nothing
+   * could act on it.
+   */
+  resolveServiceTicket: (id: string, note: string) => void
 
   resetDemoData: () => void
 }
@@ -472,6 +480,38 @@ export const useCrmStore = create<CrmState>((set, get) => ({
             action: 'Survey invite suppressed',
             detail: reason,
             source: 'DICE' as const,
+            at: DEMO_NOW.toISOString(),
+          },
+          ...state.activities,
+        ],
+      }
+    }),
+
+  resolveServiceTicket: (id, note) =>
+    set((state) => {
+      const existing = state.serviceTickets.find((t) => t.id === id)
+      if (!existing || existing.status === 'resolved') return state
+
+      const updated: ServiceTicket = {
+        ...existing,
+        status: 'resolved',
+        resolvedAt: DEMO_NOW.toISOString(),
+      }
+
+      activitySeq += 1
+      return {
+        serviceTickets: state.serviceTickets.map((t) =>
+          t.id === id ? updated : t,
+        ),
+        activities: [
+          {
+            id: nextId('ACT', activitySeq),
+            object: 'Activity' as const,
+            recordId: id,
+            recordName: existing.customerName,
+            action: 'Service ticket resolved',
+            detail: note,
+            source: 'Rep' as const,
             at: DEMO_NOW.toISOString(),
           },
           ...state.activities,

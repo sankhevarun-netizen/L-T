@@ -42,6 +42,7 @@ const SEVERITY_RANK: Record<string, number> = {
 }
 
 export function ServiceTicketsPage() {
+  const resolveServiceTicket = useCrmStore((s) => s.resolveServiceTicket)
   const router = useRouter()
   const tickets = useCrmStore((s) => s.serviceTickets)
 
@@ -187,6 +188,35 @@ export function ServiceTicketsPage() {
       render: (t) => (
         <span className="whitespace-nowrap text-slate-600">{t.category}</span>
       ),
+    },
+    {
+      /*
+       * Resolving a ticket is what closes the loop the platform is built on:
+       * it flagged that advocacy was at risk, and until now nothing could act
+       * on it. Resolving here moves the detractor risk on CSAT & NPS.
+       */
+      key: 'resolve',
+      header: '',
+      render: (t) =>
+        t.status === 'resolved' ? (
+          <span className="whitespace-nowrap text-[11px] font-semibold text-status-success">
+            Resolved
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              resolveServiceTicket(
+                t.id,
+                `${t.subject} closed with the customer.`,
+              )
+            }}
+            className="whitespace-nowrap rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600 transition-colors hover:bg-kpmg-teal/10 hover:text-kpmg-teal"
+          >
+            Resolve
+          </button>
+        ),
     },
     {
       key: 'severity',

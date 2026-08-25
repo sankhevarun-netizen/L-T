@@ -11,6 +11,7 @@ import {
   selectOverallConversion,
   selectTopCampaigns,
 } from './overview'
+import { selectNpsSummary } from './feedback'
 
 /**
  * Single subscription point for the Overview.
@@ -23,9 +24,12 @@ export function useOverviewData() {
   const ctx = useAgentContext()
   const { leads, bookings } = ctx
 
+  // NPS comes from the feedback book, so the Overview shows satisfaction
+  // beside revenue rather than hiding it one click into the rail.
+  const surveyResponses = useCrmStore((s) => s.surveyResponses)
   const kpis = useMemo(
-    () => selectKpiValues(leads, bookings),
-    [leads, bookings],
+    () => selectKpiValues(leads, bookings, selectNpsSummary(surveyResponses).nps),
+    [leads, bookings, surveyResponses],
   )
   const funnel = useMemo(() => selectFunnel(leads), [leads])
   const overallConversion = useMemo(
