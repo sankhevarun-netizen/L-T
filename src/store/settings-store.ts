@@ -7,17 +7,16 @@ import type { AIMode } from '@/lib/ai'
 /**
  * Where the numbers on screen come from.
  *
- * Only "example" resolves to anything today. It is modelled as a selectable
- * source rather than an unstated assumption so a client sees the choice being
- * made, and sees that connecting their own data is a step someone has to take
- * rather than something that quietly already happened.
+ * Both sources are demonstration data. Switching regenerates the feedback book
+ * from a different seed so every figure changes coherently, which is what makes
+ * the control worth having in a walkthrough. A persistent notice says so on
+ * screen, because a source labelled "client" that silently showed synthetic
+ * figures would be the one thing this control must never do.
  */
 export type DataSource = 'example' | 'client'
 
 interface SettingsState {
   dataSource: DataSource
-  /** No client org is connected in this build. */
-  clientDataAvailable: boolean
   setDataSource: (source: DataSource) => void
   aiMode: AIMode
   /** Whether the server reports an ANTHROPIC_API_KEY; null until probed. */
@@ -28,33 +27,28 @@ interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   dataSource: 'example',
-  clientDataAvailable: false,
 
-  setDataSource: (dataSource) => {
-    // Selecting a source that is not connected would show the same synthetic
-    // figures under a label claiming they came from the client. Refuse it.
-    if (dataSource === 'client' && !get().clientDataAvailable) return
-    set({ dataSource })
-  },
+  setDataSource: (dataSource) => set({ dataSource }),
 
   aiMode: 'mock',
   liveAvailable: null,
 
-  setAiMode: (aiMode) => {
-    // Live is only selectable when the server actually holds a key.
-    if (aiMode === 'live' && get().liveAvailable === false) return
-    set({ aiMode })
-  },
+  // Live is always selectable. Without a server key the live service falls back
+  // per call to a simulated response, and the notice on screen says which.
+  setAiMode: (aiMode) => set({ aiMode }),
 
+  /**
+   * Records whether a real key is present, without gating anything on it.
+   * The value only decides the wording of the on-screen notice.
+   */
   probeLiveAvailability: async () => {
     if (get().liveAvailable !== null) return
     try {
       const response = await fetch('/api/ai')
       const data = (await response.json()) as { available?: boolean }
       set({ liveAvailable: Boolean(data.available) })
-      if (!data.available) set({ aiMode: 'mock' })
     } catch {
-      set({ liveAvailable: false, aiMode: 'mock' })
+      set({ liveAvailable: false })
     }
   },
 }))

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 
 import { DemoMenu } from './demo-menu'
+import { DemoNotice } from './demo-notice'
 import { Header } from './header'
 import { LastUpdated } from './last-updated'
 import { Sidebar } from './sidebar'
@@ -28,6 +29,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
+
+      <DemoNotice />
     </TooltipProvider>
   )
 }

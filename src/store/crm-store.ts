@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 
 import { buildSeedDataset } from '@/data/generator'
+import { DATA_SOURCE_SEEDS, buildFeedback } from '@/data/feedback-generator'
 import { DEMO_NOW } from '@/data/reference'
 import type {
   Booking,
@@ -114,6 +115,14 @@ export interface CrmState {
    * could act on it.
    */
   resolveServiceTicket: (id: string, note: string) => void
+  /**
+   * Regenerates the feedback book for a data source.
+   *
+   * Only feedback is rebuilt: the lead book, campaigns and reps are the same
+   * organisation either way, so re-rolling them would make the switch look like
+   * a different company rather than a different feed.
+   */
+  setFeedbackSource: (source: 'example' | 'client') => void
 
   resetDemoData: () => void
 }
@@ -512,6 +521,35 @@ export const useCrmStore = create<CrmState>((set, get) => ({
             action: 'Service ticket resolved',
             detail: note,
             source: 'Rep' as const,
+            at: DEMO_NOW.toISOString(),
+          },
+          ...state.activities,
+        ],
+      }
+    }),
+
+  setFeedbackSource: (source) =>
+    set((state) => {
+      const feedback = buildFeedback({
+        leads: state.leads,
+        bookings: state.bookings,
+        siteVisits: state.siteVisits,
+        serviceTickets: state.serviceTickets,
+        seed: DATA_SOURCE_SEEDS[source],
+      })
+
+      activitySeq += 1
+      return {
+        ...feedback,
+        activities: [
+          {
+            id: nextId('ACT', activitySeq),
+            object: 'Activity' as const,
+            recordId: 'data-source',
+            recordName: source === 'client' ? 'Client org' : 'Example data',
+            action: 'Feedback source switched',
+            detail: `${feedback.surveyResponses.length} responses loaded`,
+            source: 'EAI Ingestion' as const,
             at: DEMO_NOW.toISOString(),
           },
           ...state.activities,

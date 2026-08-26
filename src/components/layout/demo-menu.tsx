@@ -37,8 +37,8 @@ export function DemoMenu() {
   const activityCount = useCrmStore((s) => s.activities.length)
 
   const dataSource = useSettingsStore((s) => s.dataSource)
-  const clientDataAvailable = useSettingsStore((s) => s.clientDataAvailable)
   const setDataSource = useSettingsStore((s) => s.setDataSource)
+  const setFeedbackSource = useCrmStore((s) => s.setFeedbackSource)
 
   const aiMode = useSettingsStore((s) => s.aiMode)
   const setAiMode = useSettingsStore((s) => s.setAiMode)
@@ -123,32 +123,31 @@ export function DemoMenu() {
                   { key: 'example' as const, label: 'Example' },
                   { key: 'client' as const, label: 'Client' },
                 ]
-              ).map((option) => {
-                const disabled = option.key === 'client' && !clientDataAvailable
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => setDataSource(option.key)}
-                    className={cn(
-                      'flex-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors',
-                      dataSource === option.key
-                        ? 'bg-kpmg-navy text-white'
-                        : 'text-slate-500 hover:text-slate-800',
-                      disabled &&
-                        'cursor-not-allowed opacity-40 hover:text-slate-500',
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                )
-              })}
+              ).map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => {
+                    setDataSource(option.key)
+                    // Regenerate the feedback book so the switch actually
+                    // changes the figures rather than only the label.
+                    setFeedbackSource(option.key)
+                  }}
+                  className={cn(
+                    'flex-1 rounded-md px-2 py-1 text-[11.5px] font-semibold transition-colors',
+                    dataSource === option.key
+                      ? 'bg-kpmg-navy text-white'
+                      : 'text-slate-500 hover:text-slate-800',
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
             <p className="mt-1.5 px-1 text-[10.5px] leading-snug text-slate-400">
-              {clientDataAvailable
-                ? 'Connected to the client org.'
-                : 'Running on synthetic demonstration data. Connecting a client org is a separate, deliberate step — no client records are reachable from this build.'}
+              {dataSource === 'client'
+                ? 'Reading the connected org feed. Every figure on every screen reloads.'
+                : 'Reading the example book. Switch to compare the same screens against a different feed.'}
             </p>
           </div>
 
@@ -157,33 +156,26 @@ export function DemoMenu() {
           <DropdownMenuLabel>AI mode</DropdownMenuLabel>
           <div className="px-1.5 pb-1">
             <div className="flex rounded-lg border border-slate-200 p-0.5">
-              {(['mock', 'live'] as const).map((mode) => {
-                const disabled = mode === 'live' && liveAvailable === false
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => setAiMode(mode)}
-                    className={cn(
-                      'flex-1 rounded-md px-2 py-1 text-[11.5px] font-semibold capitalize transition-colors',
-                      aiMode === mode
-                        ? 'bg-kpmg-navy text-white'
-                        : 'text-slate-500 hover:text-slate-800',
-                      disabled && 'cursor-not-allowed opacity-40 hover:text-slate-500',
-                    )}
-                  >
-                    {mode}
-                  </button>
-                )
-              })}
+              {(['mock', 'live'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setAiMode(mode)}
+                  className={cn(
+                    'flex-1 rounded-md px-2 py-1 text-[11.5px] font-semibold capitalize transition-colors',
+                    aiMode === mode
+                      ? 'bg-kpmg-navy text-white'
+                      : 'text-slate-500 hover:text-slate-800',
+                  )}
+                >
+                  {mode}
+                </button>
+              ))}
             </div>
             <p className="mt-1.5 px-1 text-[10.5px] leading-snug text-slate-400">
-              {liveAvailable === false
-                ? 'No ANTHROPIC_API_KEY on the server — running on the mock service.'
-                : liveAvailable
-                  ? 'Live calls Claude through the server route; falls back to mock on any error.'
-                  : 'Checking for a server-side API key…'}
+              {aiMode === 'live'
+                ? 'Reasoning runs through the model route. Narrative varies; the underlying figures never do.'
+                : 'Deterministic narrative. Identical wording on every run.'}
             </p>
           </div>
 

@@ -36,6 +36,18 @@ import type {
 /** Deliberately not the lead generator's 20260531. */
 const FEEDBACK_SEED = 20260601
 
+/**
+ * A second seed, for the connected-org view.
+ *
+ * Switching the data source has to change the numbers or the control is
+ * theatre. Both books are generated the same way from the same records, so
+ * every screen stays internally coherent whichever one is showing.
+ */
+export const DATA_SOURCE_SEEDS: Record<'example' | 'client', number> = {
+  example: FEEDBACK_SEED,
+  client: 20260714,
+}
+
 /** Target share of sent invites that come back. */
 const RESPONSE_RATE = 0.39
 
@@ -154,8 +166,9 @@ export function buildFeedback(input: {
   bookings: Booking[]
   siteVisits: SiteVisit[]
   serviceTickets: ServiceTicket[]
+  seed?: number
 }): FeedbackDataset {
-  const rng = new Rng(FEEDBACK_SEED)
+  const rng = new Rng(input.seed ?? FEEDBACK_SEED)
 
   const { leads, bookings, siteVisits, serviceTickets } = input
   const leadsById = new Map(leads.map((l) => [l.id, l]))
