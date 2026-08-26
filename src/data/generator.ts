@@ -705,7 +705,13 @@ export function buildSeedDataset(): SeedDataset {
 
   /* ---- 8. Feedback, on its own PRNG ---- */
 
-  const feedback = buildFeedback({ leads, bookings, siteVisits, serviceTickets })
+  const feedback = buildFeedback({
+    leads,
+    bookings,
+    siteVisits,
+    serviceTickets,
+    payments,
+  })
 
   return {
     leads,

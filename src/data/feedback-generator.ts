@@ -11,6 +11,7 @@ import { Rng } from './rng'
 import type {
   Booking,
   Lead,
+  Payment,
   RecoveryCase,
   Sentiment,
   ServiceTicket,
@@ -155,6 +156,81 @@ function signalsFor(lead: Lead, touchpoint: TouchpointId, fatigue: number) {
   return out
 }
 
+/**
+ * Why an invite is held back.
+ *
+ * First rule that applies wins, ordered by how absolute the objection is: a
+ * preference beats a complaint, a complaint beats a bill, a bill beats a deal
+ * in progress. Every rule reads a real record on the lead, so a held-back row
+ * can be defended the same way every other claim in this feature can.
+ */
+function suppressionFor(input: {
+  lead: Lead
+  hasOpenTicket: boolean
+  hasOverduePayment: boolean
+  fatigue: number
+}): { label: string; reason: string } | null {
+  const { lead, hasOpenTicket, hasOverduePayment, fatigue } = input
+  const first = lead.name.split(' ')[0]
+
+  if (lead.dnd) {
+    return {
+      label: 'Do not contact',
+      reason: `${first} is marked Do Not Contact. Outreach is suppressed regardless of predicted response.`,
+    }
+  }
+
+  if (hasOpenTicket) {
+    return {
+      label: 'Open complaint',
+      reason:
+        'An unresolved service ticket is open. Asking for a score before the complaint is closed measures the complaint, not the relationship.',
+    }
+  }
+
+  if (hasOverduePayment) {
+    return {
+      label: 'Payment overdue',
+      reason:
+        'A payment milestone is overdue and collections are in contact. A satisfaction request landing beside a demand letter reads badly.',
+    }
+  }
+
+  if (lead.stage === 'proposal') {
+    return {
+      label: 'In negotiation',
+      reason:
+        'A proposal is live with this customer. A survey competes with the commercial conversation and risks the deal for a data point.',
+    }
+  }
+
+  if (fatigue >= 3) {
+    return {
+      label: `${fatigue} sent / 90d`,
+      reason: `${fatigue} surveys already sent in the trailing 90 days. A further invite risks fatigue and depresses the response rate for the whole cohort.`,
+    }
+  }
+
+  // 75 days, not 45. At 45 this rule alone swallowed a third of the book and
+  // the optimiser stopped looking like it ever sends anything.
+  if (lead.evidence.daysSinceLastActivity > 75) {
+    return {
+      label: 'No recent contact',
+      reason: `No inbound or outbound activity for ${lead.evidence.daysSinceLastActivity} days. A survey is the wrong way to re-open a cold relationship.`,
+    }
+  }
+
+  if (lead.evidence.emailOpens === 0 && lead.evidence.whatsappReplies === 0) {
+    return {
+      label: 'Non-responsive',
+      reason:
+        'No opens or replies on any channel to date. Sending again adds volume without adding representation.',
+    }
+  }
+
+  return null
+}
+
 export interface FeedbackDataset {
   surveyInvites: SurveyInvite[]
   surveyResponses: SurveyResponse[]
@@ -166,11 +242,12 @@ export function buildFeedback(input: {
   bookings: Booking[]
   siteVisits: SiteVisit[]
   serviceTickets: ServiceTicket[]
+  payments: Payment[]
   seed?: number
 }): FeedbackDataset {
   const rng = new Rng(input.seed ?? FEEDBACK_SEED)
 
-  const { leads, bookings, siteVisits, serviceTickets } = input
+  const { leads, bookings, siteVisits, serviceTickets, payments } = input
   const leadsById = new Map(leads.map((l) => [l.id, l]))
 
   const bookedLeadIds = new Set(bookings.map((b) => b.leadId))
@@ -184,6 +261,12 @@ export function buildFeedback(input: {
     else ticketsByLead.set(t.leadId, [t])
   }
   const projectByLead = new Map(bookings.map((b) => [b.leadId, b.projectId]))
+
+  // Leads carrying an overdue milestone. Asking someone to rate you days after
+  // a demand letter is the fastest way to buy a detractor you created.
+  const overdueLeadIds = new Set(
+    payments.filter((p) => p.status === 'overdue').map((p) => p.leadId),
+  )
 
   const surveyInvites: SurveyInvite[] = []
   const surveyResponses: SurveyResponse[] = []
@@ -306,8 +389,17 @@ export function buildFeedback(input: {
       // which reads as broken data rather than as a young feedback programme.
       const daysAgo = rng.int(2, 178)
 
-      // Restraint first: fatigue or DND means the invite is never sent.
-      if (fatigue >= 3 || lead.dnd) {
+      // Restraint first. An optimiser that only ever says "send" is a list.
+      const suppression = suppressionFor({
+        lead,
+        hasOpenTicket: (ticketsByLead.get(lead.id) ?? []).some(
+          (t) => t.status !== 'resolved',
+        ),
+        hasOverduePayment: overdueLeadIds.has(lead.id),
+        fatigue,
+      })
+
+      if (suppression) {
         surveyInvites.push({
           id,
           leadId: lead.id,
@@ -320,9 +412,8 @@ export function buildFeedback(input: {
           fatigueScore: fatigue,
           recommendedWindow: '-',
           eligible: false,
-          suppressedReason: lead.dnd
-            ? 'Customer is marked Do Not Contact. Outreach suppressed regardless of predicted response.'
-            : `${fatigue} surveys already sent in the trailing 90 days. A further invite risks fatigue.`,
+          suppressedLabel: suppression.label,
+          suppressedReason: suppression.reason,
           signals: signalsFor(lead, touchpoint, fatigue),
         })
         return

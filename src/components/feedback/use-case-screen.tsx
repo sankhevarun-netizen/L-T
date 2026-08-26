@@ -52,9 +52,11 @@ function SegmentedBar({ active }: { active: string }) {
 
       {(['type-1', 'type-2'] as FeedbackType[]).map((type) => (
         <div key={type} className="flex items-center gap-1">
-          <span className="px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
-            {type === 'type-1' ? 'Traditional' : 'AI-Powered'}
-          </span>
+          {type === 'type-2' && (
+            <span className="px-1.5 text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
+              AI-Powered
+            </span>
+          )}
           {ROUTE_ORDER.filter((r) => r.type === type).map((route) => (
             <Link
               key={route.slug}
@@ -96,7 +98,7 @@ export function UseCaseScreen({ slug }: { slug: string }) {
           </p>
           <h2 className="mt-0.5 text-[18px] font-bold tracking-[-0.01em] text-slate-900">
             {isTypeOne
-              ? 'Traditional CSAT & NPS Reporting'
+              ? 'CSAT & NPS Reporting'
               : useCase.name}
           </h2>
           <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-slate-500">

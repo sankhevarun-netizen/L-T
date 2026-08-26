@@ -435,6 +435,8 @@ export interface SurveyInvite {
   eligible: boolean
   /** Populated when `eligible` is false — why the optimiser held back. */
   suppressedReason?: string
+  /** Short chip for the held-back list, e.g. "Payment overdue". */
+  suppressedLabel?: string
   /** Signals behind the propensity score, shown as evidence. */
   signals: string[]
   featured?: boolean

@@ -67,10 +67,6 @@ function TypeOneCard({
         <p className="text-[11.5px] leading-snug text-slate-500">
           {useCase.problem}
         </p>
-
-        <p className="mt-auto pt-1 text-[11px] font-medium italic text-slate-400">
-          {useCase.aiAction}
-        </p>
       </div>
     </Link>
   )
@@ -251,8 +247,8 @@ export function CsatNpsHub() {
             Customer Feedback Intelligence
           </h2>
           <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-white/60">
-            Nine capabilities across two types. Traditional reporting says what
-            happened; the intelligence layer decides who to ask, explains why a
+            Nine capabilities across two types. Reporting says what happened;
+            the intelligence layer decides who to ask, explains why a
             score moved, and turns a detractor into a governed recovery action.
           </p>
         </div>
@@ -280,9 +276,11 @@ export function CsatNpsHub() {
           <p className="min-w-0 text-[11.5px] text-slate-400">
             {FEEDBACK_TYPE_META['type-1'].blurb}
           </p>
-          <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-500">
-            {FEEDBACK_TYPE_META['type-1'].caption}
-          </span>
+          {FEEDBACK_TYPE_META['type-1'].caption && (
+            <span className="ml-auto shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-500">
+              {FEEDBACK_TYPE_META['type-1'].caption}
+            </span>
+          )}
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
@@ -305,11 +303,10 @@ export function CsatNpsHub() {
           />
           <div className="min-w-0 flex-1">
             <h4 className="text-[13px] font-bold text-slate-900">
-              Where traditional reporting stops
+              Where reporting stops
             </h4>
             <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">
-              Traditional reporting shows scores, trends and sentiment
-              distribution. It does not determine any of the following — each
+              Reporting shows scores, trends and sentiment distribution. It does not determine any of the following — each
               one is answered by the intelligence layer below.
             </p>
 

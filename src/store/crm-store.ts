@@ -160,6 +160,7 @@ function seedState(source: 'example' | 'client' = 'example') {
         bookings: data.bookings,
         siteVisits: data.siteVisits,
         serviceTickets: data.serviceTickets,
+        payments: data.payments,
         seed: DATA_SOURCE_SEEDS.client,
       }),
     )
@@ -576,6 +577,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         bookings: state.bookings,
         siteVisits: state.siteVisits,
         serviceTickets: state.serviceTickets,
+        payments: state.payments,
         seed: DATA_SOURCE_SEEDS[source] + variant * 7919,
       })
 
@@ -606,6 +608,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         bookings: state.bookings,
         siteVisits: state.siteVisits,
         serviceTickets: state.serviceTickets,
+        payments: state.payments,
         seed: DATA_SOURCE_SEEDS[source],
       })
 

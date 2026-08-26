@@ -341,6 +341,7 @@ export const FEATURED_INVITES: FeaturedInvite[] = [
     fatigueScore: 3,
     recommendedWindow: '-',
     eligible: false,
+    suppressedLabel: '3 sent / 90d',
     suppressedReason:
       'Three surveys already sent in the trailing 90 days. A fourth risks fatigue and depresses the response rate for the whole cohort.',
     signals: [

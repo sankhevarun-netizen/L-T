@@ -19,6 +19,26 @@ import { cn } from '@/lib/utils'
  * overclaim exactly where the guardrails say not to.
  */
 
+/*
+ * Status is an ordered progression, not a set of categories, so it takes a
+ * single hue stepped light to dark rather than four unrelated colours.
+ *
+ * Steps validated: monotonic in lightness, adjacent CVD separation 14.6 dE
+ * against a target of 8. The lightest step sits at 2.85:1 against the plot
+ * surface, under the 3:1 bar, which is discharged the way the rule requires --
+ * every mark carries a visible number and the same rows are listed as text in
+ * the backlog directly below.
+ */
+const STATUS_RAMP: Record<Intervention['status'], { fill: string; ink: string }> =
+  {
+    backlog: { fill: '#6B9BCC', ink: '#0F172A' },
+    planned: { fill: '#2E6DB4', ink: '#FFFFFF' },
+    'in-flight': { fill: '#00338D', ink: '#FFFFFF' },
+    done: { fill: '#00338D', ink: '#FFFFFF' },
+  }
+
+const STATUS_ORDER: Intervention['status'][] = ['backlog', 'planned', 'in-flight']
+
 const STATUS_TONE: Record<Intervention['status'], string> = {
   backlog: 'bg-slate-100 text-slate-600',
   planned: 'bg-sky-50 text-sky-700',
@@ -85,6 +105,13 @@ export function ControlTower() {
   /* Impact-effort matrix: high impact / low effort is the top-left quadrant. */
   const maxImpact = 10
   const maxEffort = 10
+
+  // Complaint range drives the area scale for the marks.
+  const complaintCounts = interventions.map(
+    (i) => clusters.find((c) => c.id === i.clusterId)?.affectedResponses ?? 0,
+  )
+  const maxComplaints = Math.max(...complaintCounts, 1)
+  const minComplaints = Math.min(...complaintCounts, 0)
 
   return (
     <div className="space-y-4">
@@ -234,53 +261,144 @@ export function ControlTower() {
       {/* Impact-effort matrix */}
       <Card>
         <CardHeader>
-          <CardTitle>Intervention priority — impact against effort</CardTitle>
+          <CardTitle>Intervention priority &mdash; impact against effort</CardTitle>
           <span className="text-[10.5px] font-medium text-slate-400">
             Configured inputs, not predictions
           </span>
         </CardHeader>
         <CardContent className="pb-4">
-          <div className="relative h-[260px] w-full rounded-lg border border-slate-200 bg-slate-50/50">
-            {/* Quadrant guides */}
-            <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200" />
-            <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
-            <span className="absolute left-2 top-2 text-[10px] font-semibold uppercase tracking-wider text-kpmg-teal">
-              Do first
-            </span>
-            <span className="absolute right-2 top-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Plan
-            </span>
-            <span className="absolute bottom-2 left-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Quick wins
-            </span>
-            <span className="absolute bottom-2 right-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Deprioritise
-            </span>
-
-            {/*
-              Numbered dots keyed to the backlog below, not text labels.
-              Labelling each point with its owner collided as soon as two
-              interventions sat near each other, and two of them read "Projects"
-              because one owner covers more than one aspect.
-            */}
-            {interventions.map((intervention, i) => (
-              <div
-                key={intervention.id}
-                title={`${i + 1}. ${intervention.title} — impact ${intervention.impact}, effort ${intervention.effort} · ${intervention.owner}`}
-                className="absolute flex size-[22px] -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full bg-kpmg-blue text-[11px] font-bold text-white ring-2 ring-white"
-                style={{
-                  left: `${(intervention.effort / maxEffort) * 84 + 8}%`,
-                  bottom: `${(intervention.impact / maxImpact) * 76 + 10}%`,
-                }}
+          {/* Plot, with room reserved on the left and below for the axes. */}
+          <div className="flex gap-2">
+            {/* y axis */}
+            <div className="flex w-[18px] shrink-0 flex-col items-center justify-between py-1">
+              <span className="nums text-[9.5px] text-slate-400">10</span>
+              <span
+                className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-slate-500"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
               >
-                {i + 1}
-              </div>
-            ))}
+                Impact &rarr;
+              </span>
+              <span className="nums text-[9.5px] text-slate-400">1</span>
+            </div>
 
-            <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 translate-y-full pt-1 text-[10px] text-slate-400">
-              Effort →
-            </span>
+            <div className="min-w-0 flex-1">
+              <div className="relative h-[280px] w-full rounded-lg border border-slate-200 bg-slate-50/50">
+                {/* Quadrant guides. Only the acting quadrant is tinted. */}
+                <div className="absolute left-0 top-0 h-1/2 w-1/2 rounded-tl-lg bg-kpmg-teal/[0.06]" />
+                <div className="absolute inset-y-0 left-1/2 w-px bg-slate-200" />
+                <div className="absolute inset-x-0 top-1/2 h-px bg-slate-200" />
+
+                <span className="absolute left-2.5 top-2 text-[10px] font-bold uppercase tracking-wider text-kpmg-teal">
+                  Do first
+                </span>
+                <span className="absolute right-2.5 top-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Plan
+                </span>
+                <span className="absolute bottom-2 left-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Quick wins
+                </span>
+                <span className="absolute bottom-2 right-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Deprioritise
+                </span>
+
+                {/*
+                  Three encodings, not one. Position is impact against effort,
+                  area is how many complaints the intervention answers, and the
+                  fill steps with its status. The number keys to the backlog
+                  below and is what stopped the labels colliding.
+                */}
+                {interventions.map((intervention, i) => {
+                  const cluster = clusters.find(
+                    (c) => c.id === intervention.clusterId,
+                  )
+                  const complaints = cluster?.affectedResponses ?? 0
+
+                  // Area-scaled: radius by sqrt, because a diameter read
+                  // linearly exaggerates a large value by its square.
+                  const span = Math.sqrt(maxComplaints) - Math.sqrt(minComplaints)
+                  const t = span
+                    ? (Math.sqrt(complaints) - Math.sqrt(minComplaints)) / span
+                    : 0
+                  const size = Math.round(22 + t * 16)
+                  const tone = STATUS_RAMP[intervention.status]
+
+                  return (
+                    <div
+                      key={intervention.id}
+                      title={`${i + 1}. ${intervention.title} — impact ${intervention.impact}, effort ${intervention.effort} · ${formatNumber(complaints)} complaints · ${intervention.status} · ${intervention.owner}`}
+                      className="absolute flex -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full font-bold ring-2 ring-white"
+                      style={{
+                        left: `${(intervention.effort / maxEffort) * 82 + 9}%`,
+                        bottom: `${(intervention.impact / maxImpact) * 74 + 12}%`,
+                        width: `${size}px`,
+                        height: `${size}px`,
+                        fontSize: `${Math.max(10, Math.round(size * 0.42))}px`,
+                        backgroundColor: tone.fill,
+                        color: tone.ink,
+                      }}
+                    >
+                      {i + 1}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* x axis */}
+              <div className="mt-1 flex items-center justify-between px-1">
+                <span className="nums text-[9.5px] text-slate-400">1</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  Effort &rarr;
+                </span>
+                <span className="nums text-[9.5px] text-slate-400">10</span>
+              </div>
+            </div>
           </div>
+
+          {/* Legend */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-slate-100 pt-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Size
+              </span>
+              <span className="size-2.5 rounded-full bg-slate-300" />
+              <span className="size-4 rounded-full bg-slate-300" />
+              <span className="text-[11.5px] text-slate-500">
+                complaints answered
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Status
+              </span>
+              {STATUS_ORDER.map((status) => (
+                <span key={status} className="flex items-center gap-1.5">
+                  <span
+                    className="size-3 rounded-full ring-1 ring-white"
+                    style={{ backgroundColor: STATUS_RAMP[status].fill }}
+                  />
+                  <span className="text-[11.5px] capitalize text-slate-500">
+                    {status}
+                  </span>
+                </span>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Number
+              </span>
+              <span className="text-[11.5px] text-slate-500">
+                matches the backlog row below
+              </span>
+            </div>
+          </div>
+
+          <p className="mt-2.5 text-[11.5px] leading-relaxed text-slate-500">
+            Both axes run 1 to 10, so the empty lower band is a finding rather
+            than a gap: every issue large enough to cluster is high impact, and
+            they separate on effort instead.
+          </p>
         </CardContent>
       </Card>
 

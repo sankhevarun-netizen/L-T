@@ -671,7 +671,7 @@ export function NpsReporting() {
         happened" and stops there.
       */}
       <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-3 text-[11.5px] leading-relaxed text-slate-500">
-        Traditional reporting ends here. These views show scores, trends and
+        Reporting ends here. These views show scores, trends and
         sentiment distribution — they do not determine who should receive a
         survey, when and how to engage, why a score changed, or which recovery
         action to trigger.

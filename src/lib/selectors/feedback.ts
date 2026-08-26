@@ -589,10 +589,54 @@ export function selectSurveyQueue(invites: SurveyInvite[]) {
     .sort((a, b) => b.responsePropensity - a.responsePropensity)
     .map((invite) => ({ invite, band: bandFor(invite.responsePropensity) }))
 
-  const suppressed = invites
-    .filter((i) => i.status === 'suppressed')
-    .sort((a, b) => b.fatigueScore - a.fatigueScore)
-    .map((invite) => ({ invite, band: bandFor(invite.responsePropensity) }))
+  /*
+   * One row per customer, with the reasons interleaved.
+   *
+   * A lead carries an invite per touchpoint, so a suppressed customer appeared
+   * three times in a row with the same sentence. Deduplicating fixes that.
+   * Sorting alone does not fix the rest: any single sort key groups identical
+   * reasons together, so the top of a list of eight distinct reasons still read
+   * as one. Taking the strongest remaining row from each reason in turn shows
+   * the range of judgements being made, which is the point of the panel.
+   */
+  const bestPerLead = new Map<string, SurveyInvite>()
+  for (const invite of invites) {
+    if (invite.status !== 'suppressed') continue
+    const held = bestPerLead.get(invite.leadId)
+    if (!held || invite.responsePropensity > held.responsePropensity) {
+      bestPerLead.set(invite.leadId, invite)
+    }
+  }
+
+  const byReason = new Map<string, SurveyInvite[]>()
+  for (const invite of bestPerLead.values()) {
+    const key = invite.suppressedLabel ?? 'other'
+    const list = byReason.get(key)
+    if (list) list.push(invite)
+    else byReason.set(key, [invite])
+  }
+  for (const list of byReason.values()) {
+    list.sort((a, b) => b.responsePropensity - a.responsePropensity)
+  }
+
+  const queues = [...byReason.values()]
+  const interleaved: SurveyInvite[] = []
+  for (let round = 0; interleaved.length < bestPerLead.size; round++) {
+    let moved = false
+    for (const list of queues) {
+      const next = list[round]
+      if (next) {
+        interleaved.push(next)
+        moved = true
+      }
+    }
+    if (!moved) break
+  }
+
+  const suppressed = interleaved.map((invite) => ({
+    invite,
+    band: bandFor(invite.responsePropensity),
+  }))
 
   const sent = invites.filter((i) => i.status !== 'queued' && i.status !== 'suppressed')
   const responded = sent.filter((i) => i.status === 'responded').length

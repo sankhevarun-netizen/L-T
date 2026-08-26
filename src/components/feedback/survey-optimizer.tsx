@@ -290,7 +290,8 @@ export function SurveyOptimizer() {
                       {invite.customerName}
                     </p>
                     <span className="nums shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-amber-700">
-                      {invite.fatigueScore} sent / 90d
+                      {invite.suppressedLabel ??
+                        `${invite.fatigueScore} sent / 90d`}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] leading-snug text-slate-500">

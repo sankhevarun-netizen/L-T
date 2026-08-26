@@ -31,13 +31,12 @@ export type NarrativeBeat = 'collect' | 'understand' | 'act'
 
 export const FEEDBACK_TYPE_META: Record<
   FeedbackType,
-  { label: string; blurb: string; caption: string; accent: string }
+  { label: string; blurb: string; caption?: string; accent: string }
 > = {
   'type-1': {
-    label: 'Traditional CSAT & NPS Reporting',
+    label: 'CSAT & NPS Reporting',
     blurb:
       'Descriptive reporting. Answers what happened, and establishes the baseline.',
-    caption: 'Minimal AI value addition',
     // Slate rather than a brand accent: the plainness is the argument.
     accent: 'text-slate-500',
   },
