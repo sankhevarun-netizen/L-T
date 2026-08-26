@@ -2,6 +2,7 @@
 
 import { Info } from 'lucide-react'
 
+import { useCrmStore } from '@/store/crm-store'
 import { useSettingsStore } from '@/store/settings-store'
 
 /**
@@ -15,6 +16,7 @@ import { useSettingsStore } from '@/store/settings-store'
 export function DemoNotice() {
   const dataSource = useSettingsStore((s) => s.dataSource)
   const aiMode = useSettingsStore((s) => s.aiMode)
+  const variant = useCrmStore((s) => s.feedbackVariant)
 
   return (
     <aside
@@ -28,8 +30,9 @@ export function DemoNotice() {
       <p className="mt-1 text-[11px] leading-snug text-amber-800">
         {dataSource === 'client' ? 'Connected org feed' : 'Example book'}
         {' · '}
-        {aiMode === 'live' ? 'live reasoning' : 'mock reasoning'}. Simulated
-        throughout — no real customer is represented.
+        {aiMode === 'live' ? 'live reasoning' : 'mock reasoning'}
+        {variant > 0 ? ` · variant ${variant}` : ''}. Simulated throughout — no
+        real customer is represented.
       </p>
     </aside>
   )

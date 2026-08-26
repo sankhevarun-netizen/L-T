@@ -123,6 +123,19 @@ export interface CrmState {
    * a different company rather than a different feed.
    */
   setFeedbackSource: (source: 'example' | 'client') => void
+  /**
+   * How many times the feedback book has been re-rolled. 0 is the canonical
+   * book every rehearsed figure refers to.
+   */
+  feedbackVariant: number
+  /**
+   * Draws a fresh feedback book.
+   *
+   * Deliberately separate from reset, which restores. Reset promises the same
+   * numbers every time so a rehearsed line still holds; this promises new ones.
+   * One button cannot make both promises.
+   */
+  shuffleFeedback: (source: 'example' | 'client') => void
 
   /**
    * Restores the seeded state.
@@ -167,6 +180,7 @@ function seedState(source: 'example' | 'client' = 'example') {
     transcripts: data.transcripts,
     tasks: data.tasks,
     activities: [] as SfActivity[],
+    feedbackVariant: 0,
     surveyInvites: data.surveyInvites,
     surveyResponses: data.surveyResponses,
     recoveryCases: data.recoveryCases,
@@ -551,6 +565,40 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       }
     }),
 
+  shuffleFeedback: (source) =>
+    set((state) => {
+      const variant = state.feedbackVariant + 1
+      // Stepped by a prime rather than randomised, so a given variant number
+      // always reproduces the same book. Press it twice, go back, press it
+      // twice again, and you land on the same figures.
+      const feedback = buildFeedback({
+        leads: state.leads,
+        bookings: state.bookings,
+        siteVisits: state.siteVisits,
+        serviceTickets: state.serviceTickets,
+        seed: DATA_SOURCE_SEEDS[source] + variant * 7919,
+      })
+
+      activitySeq += 1
+      return {
+        ...feedback,
+        feedbackVariant: variant,
+        activities: [
+          {
+            id: nextId('ACT', activitySeq),
+            object: 'Activity' as const,
+            recordId: 'data-source',
+            recordName: `Variant ${variant}`,
+            action: 'Feedback book re-rolled',
+            detail: `${feedback.surveyResponses.length} responses loaded`,
+            source: 'EAI Ingestion' as const,
+            at: DEMO_NOW.toISOString(),
+          },
+          ...state.activities,
+        ],
+      }
+    }),
+
   setFeedbackSource: (source) =>
     set((state) => {
       const feedback = buildFeedback({
@@ -564,6 +612,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       activitySeq += 1
       return {
         ...feedback,
+        feedbackVariant: 0,
         activities: [
           {
             id: nextId('ACT', activitySeq),
@@ -584,6 +633,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     activitySeq = 0
     taskSeq = 0
     recoverySeq = 0
+    // Back to variant 0 -- the book every rehearsed number refers to.
     set(seedState(source))
   },
 }))

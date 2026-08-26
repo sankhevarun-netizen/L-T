@@ -8,6 +8,7 @@ import {
   Gauge,
   Play,
   RotateCcw,
+  Shuffle,
   Sparkles,
   UserRound,
   Workflow,
@@ -39,6 +40,8 @@ export function DemoMenu() {
   const dataSource = useSettingsStore((s) => s.dataSource)
   const setDataSource = useSettingsStore((s) => s.setDataSource)
   const setFeedbackSource = useCrmStore((s) => s.setFeedbackSource)
+  const shuffleFeedback = useCrmStore((s) => s.shuffleFeedback)
+  const feedbackVariant = useCrmStore((s) => s.feedbackVariant)
 
   const aiMode = useSettingsStore((s) => s.aiMode)
   const setAiMode = useSettingsStore((s) => s.setAiMode)
@@ -64,6 +67,15 @@ export function DemoMenu() {
       {activityCount > 0 && (
         <span className="rounded-full bg-kpmg-teal/10 px-2 py-0.5 text-[11px] font-semibold text-kpmg-teal">
           {activityCount} CRM write{activityCount === 1 ? '' : 's'}
+        </span>
+      )}
+
+      {feedbackVariant > 0 && (
+        <span
+          title="Feedback data has been re-rolled. Reset returns to the canonical book."
+          className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700"
+        >
+          Variant {feedbackVariant}
         </span>
       )}
 
@@ -182,6 +194,10 @@ export function DemoMenu() {
 
           <DropdownMenuSeparator />
 
+          <DropdownMenuItem onClick={() => shuffleFeedback(dataSource)}>
+            <Shuffle />
+            Shuffle feedback data
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleReset}>
             <RotateCcw />
             Reset demo data
