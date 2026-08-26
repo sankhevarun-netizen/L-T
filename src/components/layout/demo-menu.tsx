@@ -53,7 +53,8 @@ export function DemoMenu() {
   }, [probe])
 
   function handleReset() {
-    resetDemoData()
+    // Restore the feed that is actually selected, not always the example one.
+    resetDemoData(dataSource)
     setJustReset(true)
     setTimeout(() => setJustReset(false), 1800)
   }

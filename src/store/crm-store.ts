@@ -124,11 +124,34 @@ export interface CrmState {
    */
   setFeedbackSource: (source: 'example' | 'client') => void
 
-  resetDemoData: () => void
+  /**
+   * Restores the seeded state.
+   *
+   * Takes the active source, because rebuilding from the default seed while
+   * the interface still reads "Client" would relabel one feed as the other --
+   * the exact mislabelling the standing notice exists to prevent.
+   */
+  resetDemoData: (source?: 'example' | 'client') => void
 }
 
-function seedState() {
+function seedState(source: 'example' | 'client' = 'example') {
   const data = buildSeedDataset()
+
+  // The generator seeds feedback for the example book; re-roll it when the
+  // connected feed is the one selected.
+  if (source === 'client') {
+    Object.assign(
+      data,
+      buildFeedback({
+        leads: data.leads,
+        bookings: data.bookings,
+        siteVisits: data.siteVisits,
+        serviceTickets: data.serviceTickets,
+        seed: DATA_SOURCE_SEEDS.client,
+      }),
+    )
+  }
+
   const leadsById: Record<string, Lead> = {}
   for (const lead of data.leads) leadsById[lead.id] = lead
 
@@ -557,10 +580,10 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       }
     }),
 
-  resetDemoData: () => {
+  resetDemoData: (source = 'example') => {
     activitySeq = 0
     taskSeq = 0
     recoverySeq = 0
-    set(seedState())
+    set(seedState(source))
   },
 }))
