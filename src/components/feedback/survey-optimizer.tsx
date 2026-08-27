@@ -122,18 +122,14 @@ function EngagementEngine({ invite }: { invite: SurveyInvite }) {
   )
 
   /*
-   * signalsFor() writes the propensity inputs first and the channel and window
-   * reasoning after, so anything past the first three explains one of the
-   * numbered steps. Matched on content rather than by index, so a signal list
-   * of any length still lands in the right panel.
+   * Each decision reads its own field. An earlier cut picked these back out of
+   * the signals list by matching the generator's wording, which meant the
+   * authored hero record — whose signals say the same things in different
+   * words — rendered both steps with no evidence at all.
    */
-  const channelWhy = invite.signals.find((x) => x.startsWith('Highest engagement'))
-  const windowWhy = invite.signals.find(
-    (x) => x.includes('logged contacts land') || x.includes('Too little contact'),
-  )
-  const predictWhy = invite.signals.filter(
-    (x) => x !== channelWhy && x !== windowWhy,
-  )
+  const channelWhy = invite.channelReason
+  const windowWhy = invite.windowReason
+  const predictWhy = invite.signals
 
   return (
     <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3">

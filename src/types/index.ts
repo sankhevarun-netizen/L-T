@@ -437,6 +437,16 @@ export interface SurveyInvite {
   suppressedReason?: string
   /** Short chip for the held-back list, e.g. "Payment overdue". */
   suppressedLabel?: string
+  /**
+   * Why this channel and this window, carried separately from `signals`.
+   *
+   * The engagement engine shows each decision beside its own evidence. Picking
+   * that evidence back out of the signals list by matching on wording meant an
+   * authored record — whose signals are hand-written and phrased differently —
+   * silently rendered with no evidence at all.
+   */
+  channelReason?: string
+  windowReason?: string
   /** Signals behind the propensity score, shown as evidence. */
   signals: string[]
   featured?: boolean

@@ -176,15 +176,28 @@ function windowFor(
       const part = dayPartOf(e.occurredAt)
       counts.set(part, (counts.get(part) ?? 0) + 1)
     }
-    const [bestPart, bestCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
-    const options = WINDOWS_BY_DAYPART[bestPart] ?? WINDOWS
-    return {
-      window: rng.pick(options),
-      reason: `${bestCount} of ${history.length} logged contacts land in this window`,
+    const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1])
+    const [bestPart, bestCount] = ranked[0]
+    const runnerUp = ranked[1]?.[1] ?? 0
+
+    /*
+     * A winner only counts if it actually won. Three contacts spread one per
+     * day-part used to elect an arbitrary bucket and report "1 of 3 logged
+     * contacts land in this window" — a tie presented as a finding. Requiring
+     * a clear plurality means the honest answer, that there is no pattern yet,
+     * is the one that gets shown.
+     */
+    if (bestCount >= 2 && bestCount > runnerUp) {
+      const options = WINDOWS_BY_DAYPART[bestPart] ?? WINDOWS
+      return {
+        window: rng.pick(options),
+        reason: `${bestCount} of ${history.length} logged contacts land in this window`,
+      }
     }
   }
 
-  // Too little history to bucket — a channel-shaped default beats a flat guess.
+  // No usable pattern — a channel-shaped default beats a flat guess, and
+  // saying which case applies beats implying a prediction was made.
   const defaultPart =
     channel === 'call'
       ? 'weekday-day'
@@ -193,7 +206,10 @@ function windowFor(
         : 'weekday-evening'
   return {
     window: rng.pick(WINDOWS_BY_DAYPART[defaultPart] ?? WINDOWS),
-    reason: `Too little contact history to bucket — defaulted to a ${channel}-appropriate window`,
+    reason:
+      history.length >= 3
+        ? `No day-part stands out across ${history.length} logged contacts — defaulted to a ${channel}-appropriate window`
+        : `Too little contact history to bucket — defaulted to a ${channel}-appropriate window`,
   }
 }
 
@@ -264,20 +280,12 @@ function propensityFor(rng: Rng, lead: Lead, fatigue: number) {
   return Math.max(4, Math.min(96, Math.round(base + rng.float(-6, 6))))
 }
 
-function signalsFor(
-  lead: Lead,
-  touchpoint: TouchpointId,
-  fatigue: number,
-  channelReason?: string,
-  windowReason?: string,
-) {
+function signalsFor(lead: Lead, touchpoint: TouchpointId, fatigue: number) {
   const out = [
     `Last activity ${lead.evidence.daysSinceLastActivity} day(s) ago`,
     `${lead.evidence.whatsappReplies} WhatsApp repl(ies), ${lead.evidence.emailOpens} email open(s) logged`,
     `Reached the ${touchpoint.replace('-', ' ')} touchpoint at stage "${lead.stage}"`,
   ]
-  if (channelReason) out.push(channelReason)
-  if (windowReason) out.push(windowReason)
   if (fatigue > 0) out.push(`${fatigue} survey(s) already sent in 90 days`)
   return out
 }
@@ -534,7 +542,7 @@ export function buildFeedback(input: {
         channel,
         engagementsByLead.get(lead.id) ?? [],
       )
-      const signals = signalsFor(lead, touchpoint, fatigue, channelReason, windowReason)
+      const signals = signalsFor(lead, touchpoint, fatigue)
 
       // Spans the full six-month trend window. At 120 days the two earliest
       // buckets held no responses and the chart opened on a flat zero line,
@@ -567,6 +575,8 @@ export function buildFeedback(input: {
           suppressedLabel: suppression.label,
           suppressedReason: suppression.reason,
           signals,
+          channelReason,
+          windowReason,
         })
         return
       }
@@ -586,6 +596,8 @@ export function buildFeedback(input: {
           recommendedWindow: window,
           eligible: true,
           signals,
+          channelReason,
+          windowReason,
         })
         return
       }
@@ -608,6 +620,8 @@ export function buildFeedback(input: {
           recommendedWindow: window,
           eligible: true,
           signals,
+          channelReason,
+          windowReason,
         })
         return
       }
@@ -638,6 +652,8 @@ export function buildFeedback(input: {
         recommendedWindow: window,
         eligible: true,
         signals,
+        channelReason,
+        windowReason,
       })
 
       surveyResponses.push({

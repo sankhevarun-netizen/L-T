@@ -324,6 +324,9 @@ export const FEATURED_INVITES: FeaturedInvite[] = [
     fatigueScore: 0,
     recommendedWindow: 'Thu 19:00-21:00',
     eligible: true,
+    channelReason:
+      'Replies on WhatsApp within 40 minutes on average, across 11 replies',
+    windowReason: 'Evening contact answered on 4 of 4 previous attempts',
     signals: [
       'Attended a site visit 2 days ago, so recall is still fresh',
       'Replies on WhatsApp within 40 minutes on average across 11 replies',
