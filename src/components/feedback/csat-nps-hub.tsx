@@ -1,13 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, MessageSquare, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 
 import { IllustrativeBadge } from './guardrails'
 import {
   BEAT_META,
   FEEDBACK_TYPE_META,
-  TYPE_1_LIMITATIONS,
   useCasesOfType,
   type UseCaseDef,
 } from './use-cases'
@@ -291,43 +290,6 @@ export function CsatNpsHub() {
               metric={typeOneMetrics[useCase.anchor ?? ''] ?? { label: '', value: '—' }}
             />
           ))}
-        </div>
-      </section>
-
-      {/* The turn */}
-      <section className="rounded-xl border border-slate-200 border-l-[3px] border-l-amber-500 bg-white p-4 shadow-card">
-        <div className="flex items-start gap-2">
-          <MessageSquare
-            className="mt-0.5 size-4 shrink-0 text-amber-600"
-            strokeWidth={2.1}
-          />
-          <div className="min-w-0 flex-1">
-            <h4 className="text-[13px] font-bold text-slate-900">
-              Where reporting stops
-            </h4>
-            <p className="mt-0.5 text-[11.5px] leading-relaxed text-slate-500">
-              Reporting shows scores, trends and sentiment distribution. It does not determine any of the following — each
-              one is answered by the intelligence layer below.
-            </p>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {TYPE_1_LIMITATIONS.map((row) => (
-                <Link
-                  key={row.slug}
-                  href={`/csat-nps/${row.slug}`}
-                  className="group flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 transition-colors hover:bg-kpmg-blue/5"
-                >
-                  <span className="min-w-0 text-[11.5px] font-medium text-slate-600">
-                    {row.question}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-kpmg-blue">
-                    {row.answeredBy}
-                    <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
 
