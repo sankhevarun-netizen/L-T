@@ -64,7 +64,7 @@ const CHANNEL_LABEL: Record<SurveyInvite['channel'], string> = {
 }
 
 /**
- * The four decisions, as one engine.
+ * The four decisions, as one engine — the deck's KPMG SPAR AI Engine.
  *
  * Right moment, preferred channel, relevant questions and smart follow-up are
  * separate model outputs, and until now they were also separate screens — the
@@ -134,7 +134,7 @@ function EngagementEngine({ invite }: { invite: SurveyInvite }) {
   return (
     <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-kpmg-blue">
-        Feedback engagement engine
+        KPMG SPAR AI Engine
       </p>
 
       {/* Predict — the ring the four numbered decisions sit inside. */}
@@ -163,20 +163,38 @@ function EngagementEngine({ invite }: { invite: SurveyInvite }) {
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <EngineStep
           n={1}
-          title="Right moment"
-          value={
-            invite.recommendedWindow === '-'
-              ? 'Not scheduled'
-              : invite.recommendedWindow
-          }
-          evidence={windowWhy}
-        />
+          title="Smart follow-up"
+          evidence="The branch is chosen by the score the customer gives, not decided in advance."
+        >
+          <ul className="mt-1.5 space-y-1">
+            {CONDITIONAL_FOLLOW_UPS.map((row) => (
+              <li key={row.band} className="flex gap-1.5">
+                <CornerDownRight className="mt-[2px] size-3 shrink-0 text-slate-400" />
+                <span className="text-[11.5px] leading-snug text-slate-600">
+                  <span className="font-semibold text-slate-700">{row.when}</span>{' '}
+                  &mdash; {row.ask}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </EngineStep>
 
         <EngineStep
           n={2}
           title="Preferred channel"
           value={CHANNEL_LABEL[invite.channel]}
           evidence={channelWhy}
+        />
+
+        <EngineStep
+          n={4}
+          title="At the right moment"
+          value={
+            invite.recommendedWindow === '-'
+              ? 'Not scheduled'
+              : invite.recommendedWindow
+          }
+          evidence={windowWhy}
         />
 
         <EngineStep
@@ -206,24 +224,6 @@ function EngagementEngine({ invite }: { invite: SurveyInvite }) {
             Compose in full
             <span aria-hidden>&rarr;</span>
           </a>
-        </EngineStep>
-
-        <EngineStep
-          n={4}
-          title="Smart follow-up"
-          evidence="The branch is chosen by the score the customer gives, not decided in advance."
-        >
-          <ul className="mt-1.5 space-y-1">
-            {CONDITIONAL_FOLLOW_UPS.map((row) => (
-              <li key={row.band} className="flex gap-1.5">
-                <CornerDownRight className="mt-[2px] size-3 shrink-0 text-slate-400" />
-                <span className="text-[11.5px] leading-snug text-slate-600">
-                  <span className="font-semibold text-slate-700">{row.when}</span>{' '}
-                  &mdash; {row.ask}
-                </span>
-              </li>
-            ))}
-          </ul>
         </EngineStep>
       </div>
     </div>

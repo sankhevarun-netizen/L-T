@@ -541,7 +541,7 @@ export const VERBATIM_POOLS: Record<TouchpointId, Record<Sentiment, string[]>> =
  * Follow-ups fire on the answer, not on the customer — that is the point.
  *
  * Lives in the data layer because two screens ask the same question of it: the
- * journey composer shows the whole branch set, and the engagement engine shows
+ * journey composer shows the whole branch set, and the SPAR engine panel shows
  * the one branch a given score band would take.
  */
 export const CONDITIONAL_FOLLOW_UPS: {

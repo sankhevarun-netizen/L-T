@@ -1028,7 +1028,7 @@ export const NPS_BAND_ORDER: NpsBand[] = ['promoter', 'passive', 'detractor']
  * then on journey stage and persona where the library declares them — which is
  * what makes the survey specific to this customer rather than generic.
  *
- * Pure and React-free so the journey composer and the engagement engine run
+ * Pure and React-free so the journey composer and the SPAR engine panel run
  * the same selection rather than two copies that can drift apart.
  */
 export function composeQuestions(

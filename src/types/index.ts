@@ -440,7 +440,7 @@ export interface SurveyInvite {
   /**
    * Why this channel and this window, carried separately from `signals`.
    *
-   * The engagement engine shows each decision beside its own evidence. Picking
+   * The SPAR engine panel shows each decision beside its own evidence. Picking
    * that evidence back out of the signals list by matching on wording meant an
    * authored record — whose signals are hand-written and phrased differently —
    * silently rendered with no evidence at all.

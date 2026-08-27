@@ -74,7 +74,7 @@ export function FeedbackJourney() {
   const [leadId, setLeadId] = useState(authored[0]?.id ?? '')
 
   /*
-   * Deep link from the engagement engine's "Compose in full" action.
+   * Deep link from the SPAR engine panel's "Compose in full" action.
    *
    * Read in an effect rather than during render: the query string is not
    * available on the server, and seeding useState from it directly would make
