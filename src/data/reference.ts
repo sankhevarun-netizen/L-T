@@ -339,3 +339,46 @@ export const OCCUPATIONS = [
   'Banking Professional', 'Consultant', 'Architect', 'Pharma Executive',
   'Marketing Head', 'Civil Engineer', 'Lawyer', 'Professor',
 ]
+
+/**
+ * Which quarter of the week an ISO timestamp falls in.
+ *
+ * Shared by the feedback generator (to predict a contact window from a lead's
+ * own history) and by the response-knowledge selector (to report when people
+ * actually respond) — one classification, so the two never disagree about
+ * what "weekday evening" means.
+ */
+export type DayPart = 'weekday-day' | 'weekday-evening' | 'weekend-day' | 'weekend-evening'
+
+export function dayPartOf(iso: string): DayPart {
+  const d = new Date(iso)
+  const day = d.getUTCDay() // 0 Sun .. 6 Sat
+  const hour = d.getUTCHours()
+  const weekend = day === 0 || day === 6
+  const evening = hour >= 17 || hour < 6
+  if (weekend) return evening ? 'weekend-evening' : 'weekend-day'
+  return evening ? 'weekday-evening' : 'weekday-day'
+}
+
+/** Re-stamps an ISO timestamp at a given UTC hour, keeping the date. */
+export function atHour(iso: string, hour: number) {
+  const d = new Date(iso)
+  d.setUTCHours(hour, 0, 0, 0)
+  return d.toISOString()
+}
+
+/**
+ * Stable index into a pool, derived from a string key.
+ *
+ * Used where a record needs a plausible time of day: both generators carry
+ * PRNG sequences whose draw order is load-bearing, so taking a draw here would
+ * shift every number after it. Same key, same answer, no draw consumed.
+ */
+export function stableIndex(key: string, salt: number, modulo: number) {
+  let h = 2166136261 ^ salt
+  for (let i = 0; i < key.length; i += 1) {
+    h ^= key.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return Math.abs(h) % modulo
+}

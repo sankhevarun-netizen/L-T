@@ -16,6 +16,8 @@ import {
   selectPropensityHeatmap,
   selectRecoveryQueue,
   selectRecoverySummary,
+  selectRepresentation,
+  selectResponseKnowledge,
   selectRootCauseClusters,
   selectSatisfactionByPersona,
   selectSatisfactionByProject,
@@ -71,6 +73,17 @@ export function useFeedbackData() {
       recovery: selectRecoverySummary(surveyResponses, recoveryCases),
       drivers: selectDrivers(surveyResponses, themes),
       interventions: selectInterventions(clusters),
+
+      /* Outcome measures — what the engine's predictions actually produced. */
+      representation: selectRepresentation(
+        surveyInvites,
+        surveyResponses,
+        (id) => PERSONAS_BY_ID[id]?.shortName ?? id,
+      ),
+      responseKnowledge: selectResponseKnowledge(
+        surveyResponses,
+        (id) => PERSONAS_BY_ID[id]?.shortName ?? id,
+      ),
     }
   }, [surveyInvites, surveyResponses, recoveryCases])
 }

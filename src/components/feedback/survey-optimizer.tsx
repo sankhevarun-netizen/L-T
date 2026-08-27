@@ -1,7 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Ban, CircleCheck, Clock, Send, TrendingUp } from 'lucide-react'
+import {
+  Ban,
+  CircleCheck,
+  Clock,
+  CornerDownRight,
+  Send,
+  TrendingUp,
+} from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +16,9 @@ import { StatTile } from '@/components/shared/stat-tile'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { HumanReviewNote, IllustrativeBadge } from './guardrails'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
+import { composeQuestions } from '@/lib/selectors/feedback'
+import { CONDITIONAL_FOLLOW_UPS } from '@/data/feedback'
+import { usePersonaFor } from '@/lib/personas/use-persona-map'
 import { formatNumber } from '@/lib/format'
 import { useCrmStore } from '@/store/crm-store'
 import { TOUCHPOINT_LABEL, type TouchpointId } from '@/types'
@@ -51,6 +61,177 @@ const CHANNEL_LABEL: Record<SurveyInvite['channel'], string> = {
   sms: 'SMS',
   call: 'Call',
   'in-app': 'In-app',
+}
+
+/**
+ * The four decisions, as one engine.
+ *
+ * Right moment, preferred channel, relevant questions and smart follow-up are
+ * separate model outputs, and until now they were also separate screens — the
+ * customer's own record answered all four but nothing ever showed them
+ * together. Numbered because the numbering is the deck's, so what a client
+ * sees on screen matches what they were pitched.
+ *
+ * Every panel states its own evidence. A step that had nothing to read says so
+ * rather than presenting a default as a prediction.
+ */
+function EngineStep({
+  n,
+  title,
+  value,
+  evidence,
+  children,
+}: {
+  n: number
+  title: string
+  value?: string
+  evidence?: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-2.5">
+      <div className="flex items-baseline gap-1.5">
+        <span className="nums text-[13px] font-bold leading-none text-kpmg-blue">
+          {n}
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          {title}
+        </span>
+      </div>
+      {value && (
+        <p className="mt-1.5 text-[12.5px] font-semibold leading-snug text-slate-900">
+          {value}
+        </p>
+      )}
+      {children}
+      {evidence && (
+        <p className="mt-1 text-[11px] leading-snug text-slate-500">{evidence}</p>
+      )}
+    </div>
+  )
+}
+
+function EngagementEngine({ invite }: { invite: SurveyInvite }) {
+  const lead = useCrmStore((s) => s.leadsById[invite.leadId])
+  const assignment = usePersonaFor(invite.leadId)
+
+  const questions = composeQuestions(
+    lead,
+    invite.touchpoint,
+    assignment?.best.personaId,
+  )
+
+  /*
+   * signalsFor() writes the propensity inputs first and the channel and window
+   * reasoning after, so anything past the first three explains one of the
+   * numbered steps. Matched on content rather than by index, so a signal list
+   * of any length still lands in the right panel.
+   */
+  const channelWhy = invite.signals.find((x) => x.startsWith('Highest engagement'))
+  const windowWhy = invite.signals.find(
+    (x) => x.includes('logged contacts land') || x.includes('Too little contact'),
+  )
+  const predictWhy = invite.signals.filter(
+    (x) => x !== channelWhy && x !== windowWhy,
+  )
+
+  return (
+    <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-kpmg-blue">
+        Feedback engagement engine
+      </p>
+
+      {/* Predict — the ring the four numbered decisions sit inside. */}
+      <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            Predict &mdash; who is most likely to respond
+          </span>
+          <span className="nums shrink-0 text-[13px] font-bold text-slate-900">
+            {invite.responsePropensity}
+            <span className="text-[10px] font-semibold text-slate-400">/100</span>
+          </span>
+        </div>
+        <ul className="mt-1.5 space-y-1">
+          {predictWhy.map((signal, i) => (
+            <li key={i} className="flex gap-1.5">
+              <span className="mt-[7px] size-1 shrink-0 rounded-full bg-slate-400" />
+              <span className="text-[11.5px] leading-snug text-slate-600">
+                {signal}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <EngineStep
+          n={1}
+          title="Right moment"
+          value={
+            invite.recommendedWindow === '-'
+              ? 'Not scheduled'
+              : invite.recommendedWindow
+          }
+          evidence={windowWhy}
+        />
+
+        <EngineStep
+          n={2}
+          title="Preferred channel"
+          value={CHANNEL_LABEL[invite.channel]}
+          evidence={channelWhy}
+        />
+
+        <EngineStep
+          n={3}
+          title="Relevant questions"
+          evidence={`${questions.length} question(s) qualified on touchpoint, stage and persona.`}
+        >
+          <ul className="mt-1.5 space-y-1">
+            {questions.slice(0, 3).map((q) => (
+              <li key={q.id} className="flex gap-1.5">
+                <span className="mt-[6px] size-1 shrink-0 rounded-full bg-kpmg-blue/50" />
+                <span className="text-[11.5px] leading-snug text-slate-700">
+                  {q.text}
+                  {q.locked && (
+                    <span className="ml-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      locked
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <a
+            href={`/csat-nps/feedback-journey?lead=${invite.leadId}`}
+            className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-kpmg-blue hover:underline"
+          >
+            Compose in full
+            <span aria-hidden>&rarr;</span>
+          </a>
+        </EngineStep>
+
+        <EngineStep
+          n={4}
+          title="Smart follow-up"
+          evidence="The branch is chosen by the score the customer gives, not decided in advance."
+        >
+          <ul className="mt-1.5 space-y-1">
+            {CONDITIONAL_FOLLOW_UPS.map((row) => (
+              <li key={row.band} className="flex gap-1.5">
+                <CornerDownRight className="mt-[2px] size-3 shrink-0 text-slate-400" />
+                <span className="text-[11.5px] leading-snug text-slate-600">
+                  <span className="font-semibold text-slate-700">{row.when}</span>{' '}
+                  &mdash; {row.ask}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </EngineStep>
+      </div>
+    </div>
+  )
 }
 
 function QueueRow({
@@ -126,29 +307,153 @@ function QueueRow({
         </Button>
       </div>
 
-      {open && (
-        <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            Why this person, this channel, this moment
-          </p>
-          <ul className="mt-1.5 space-y-1">
-            {invite.signals.map((signal, i) => (
-              <li key={i} className="flex gap-1.5">
-                <span className="mt-[7px] size-1 shrink-0 rounded-full bg-slate-400" />
-                <span className="text-[11.5px] leading-snug text-slate-600">
-                  {signal}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {open && <EngagementEngine invite={invite} />}
     </li>
   )
 }
 
+/**
+ * What the predictions actually produced.
+ *
+ * A survey programme can lift its response rate and still only ever hear from
+ * the same segment, so participation on its own is not evidence the engine is
+ * working. These two read the responses that came back rather than restating
+ * the model's own outputs — they are the loop closing, not the pitch repeating.
+ */
+function TallyBars({
+  rows,
+}: {
+  rows: { label: string; count: number; pct: number }[]
+}) {
+  return (
+    <ul className="mt-1.5 space-y-1.5">
+      {rows.slice(0, 4).map((row) => (
+        <li key={row.label} className="flex items-center gap-2">
+          <span className="w-[104px] shrink-0 truncate text-[11.5px] text-slate-600">
+            {row.label}
+          </span>
+          <div className="h-1.5 min-w-0 flex-1 rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-kpmg-blue"
+              style={{ width: `${row.pct}%` }}
+            />
+          </div>
+          {/* The number is always printed — the bar is never the only encoding. */}
+          <span className="nums w-[34px] shrink-0 text-right text-[11.5px] font-semibold text-slate-700">
+            {row.pct}%
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function OutcomePanels({
+  representation,
+  responseKnowledge,
+}: {
+  representation: ReturnType<typeof useFeedbackData>['representation']
+  responseKnowledge: ReturnType<typeof useFeedbackData>['responseKnowledge']
+}) {
+  const gaps = [
+    ...representation.missingPersonaLabels,
+    ...representation.missingStages,
+  ]
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <Card>
+        <CardHeader>
+          <CardTitle>Broader representation</CardTitle>
+          <IllustrativeBadge />
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="flex gap-6">
+            <div>
+              <p className="nums text-[22px] font-bold leading-none text-slate-900">
+                {representation.personasHeard}
+                <span className="text-[13px] font-semibold text-slate-400">
+                  /{representation.personasAsked}
+                </span>
+              </p>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Personas heard
+              </p>
+            </div>
+            <div>
+              <p className="nums text-[22px] font-bold leading-none text-slate-900">
+                {representation.stagesHeard}
+                <span className="text-[13px] font-semibold text-slate-400">
+                  /{representation.stagesAsked}
+                </span>
+              </p>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Stages heard
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-3 text-[11.5px] leading-relaxed text-slate-500">
+            {gaps.length === 0 ? (
+              <>
+                Every persona and journey stage that was surveyed is represented
+                in the responses.
+              </>
+            ) : (
+              <>
+                Not yet heard from:{' '}
+                <span className="font-semibold text-slate-700">
+                  {gaps.join(', ')}
+                </span>
+                . Coverage is measured against who was asked, not against the
+                whole book.
+              </>
+            )}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Response knowledge</CardTitle>
+          <span className="text-[10.5px] font-medium text-slate-400">
+            Observed, not predicted
+          </span>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Who responds
+              </p>
+              <TallyBars rows={responseKnowledge.byPersona} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                When
+              </p>
+              <TallyBars rows={responseKnowledge.byDayPart} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Through which channel
+              </p>
+              <TallyBars rows={responseKnowledge.byChannel} />
+            </div>
+          </div>
+          <p className="mt-3 text-[11.5px] leading-relaxed text-slate-500">
+            Share of the {formatNumber(responseKnowledge.total)} responses
+            received. This is what the next round of targeting learns from.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export function SurveyOptimizer() {
-  const { queue, propensityHeatmap } = useFeedbackData()
+  const { queue, propensityHeatmap, representation, responseKnowledge } =
+    useFeedbackData()
   const scheduleSurveyInvite = useCrmStore((s) => s.scheduleSurveyInvite)
 
   /*
@@ -303,6 +608,11 @@ export function SurveyOptimizer() {
           </CardContent>
         </Card>
       </div>
+
+      <OutcomePanels
+        representation={representation}
+        responseKnowledge={responseKnowledge}
+      />
 
       {/* Response likelihood heatmap */}
       <Card>

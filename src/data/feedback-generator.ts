@@ -5,11 +5,20 @@ import {
   VERBATIM_POOLS,
   npsBandFor,
 } from './feedback'
-import { DEMO_NOW, PROJECTS, REPS } from './reference'
+import {
+  DEMO_NOW,
+  PROJECTS,
+  REPS,
+  atHour,
+  dayPartOf,
+  stableIndex,
+} from './reference'
 import { mapLeadToPersonas } from '@/lib/personas/mapping'
 import { Rng } from './rng'
 import type {
   Booking,
+  Engagement,
+  EngagementChannel,
   Lead,
   Payment,
   RecoveryCase,
@@ -56,6 +65,30 @@ function isoDaysBefore(days: number) {
   return new Date(DEMO_NOW.getTime() - days * 86_400_000).toISOString()
 }
 
+/**
+ * When someone actually fills the survey in.
+ *
+ * isoDaysBefore inherits DEMO_NOW's time, so every response used to land at
+ * the same hour and any measure of *when* people respond was reading a
+ * constant. Derived rather than drawn, so the feedback book's existing
+ * figures — NPS, CSAT, response counts — are untouched.
+ */
+const REPLY_HOURS: Record<SurveyChannel, number[]> = {
+  // Read on the phone, answered after work.
+  whatsapp: [9, 13, 18, 19, 20, 20, 21, 22],
+  sms: [9, 12, 18, 19, 20, 21, 21, 22],
+  // Cleared alongside the rest of the inbox.
+  email: [8, 9, 10, 11, 15, 20, 21, 22],
+  // A rep is on the line, so it happens in working hours.
+  call: [10, 11, 12, 14, 15, 16, 17, 18],
+  'in-app': [11, 13, 19, 20, 21, 21, 22, 23],
+}
+
+function replyHourFor(key: string, salt: number, channel: SurveyChannel) {
+  const pool = REPLY_HOURS[channel]
+  return pool[stableIndex(key, salt, pool.length)]
+}
+
 const PROJECT_NAME = Object.fromEntries(
   PROJECTS.map((p) => [p.id, p.name]),
 ) as Record<string, string>
@@ -78,6 +111,91 @@ const WINDOWS = [
   'Sat 11:00-13:00',
   'Sun 17:00-19:00',
 ]
+
+/** Which WINDOWS entries answer each day-part — weekday evening has two. */
+const WINDOWS_BY_DAYPART: Record<string, string[]> = {
+  'weekday-day': ['Tue 10:00-12:00'],
+  'weekday-evening': ['Wed 18:00-20:00', 'Thu 19:00-21:00'],
+  'weekend-day': ['Sat 11:00-13:00'],
+  'weekend-evening': ['Sun 17:00-19:00'],
+}
+
+/**
+ * The channel this lead is actually most reachable on.
+ *
+ * Reads engagement counts already on the record — whatsappReplies, emailOpens,
+ * callsAnswered — rather than drawing from a fixed pool with no relationship
+ * to the customer. A lead with no signal at all (genuinely new, all zero)
+ * falls back to the pool, since there is nothing yet to predict from.
+ */
+function channelFor(rng: Rng, lead: Lead): { channel: SurveyChannel; reason: string } {
+  const { whatsappReplies, emailOpens, callsAnswered, callsAttempted } = lead.evidence
+
+  const scored: { channel: SurveyChannel; score: number; reason: string }[] = [
+    {
+      channel: 'whatsapp',
+      score: whatsappReplies,
+      reason: `Highest engagement on WhatsApp — ${whatsappReplies} repl${whatsappReplies === 1 ? 'y' : 'ies'} logged`,
+    },
+    {
+      channel: 'email',
+      score: emailOpens,
+      reason: `Highest engagement on email — ${emailOpens} open${emailOpens === 1 ? '' : 's'} logged`,
+    },
+    {
+      channel: 'call',
+      score: callsAnswered * 2, // an answered call is a stronger signal than an email open
+      reason: `Highest engagement on calls — ${callsAnswered} of ${callsAttempted} answered`,
+    },
+  ]
+
+  const best = scored.reduce((a, b) => (b.score > a.score ? b : a))
+  if (best.score > 0) return { channel: best.channel, reason: best.reason }
+
+  return {
+    channel: rng.pick(CHANNELS),
+    reason: 'No engagement history on any channel yet — using the book-wide default mix',
+  }
+}
+
+/**
+ * The contact window this lead has actually been reachable in.
+ *
+ * Buckets the lead's own engagement history by day-part and recommends the
+ * bucket where contact has actually landed. Falls back to a channel-shaped
+ * default only when there is not enough history to bucket from.
+ */
+function windowFor(
+  rng: Rng,
+  channel: SurveyChannel,
+  history: Engagement[],
+): { window: string; reason: string } {
+  if (history.length >= 3) {
+    const counts = new Map<string, number>()
+    for (const e of history) {
+      const part = dayPartOf(e.occurredAt)
+      counts.set(part, (counts.get(part) ?? 0) + 1)
+    }
+    const [bestPart, bestCount] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+    const options = WINDOWS_BY_DAYPART[bestPart] ?? WINDOWS
+    return {
+      window: rng.pick(options),
+      reason: `${bestCount} of ${history.length} logged contacts land in this window`,
+    }
+  }
+
+  // Too little history to bucket — a channel-shaped default beats a flat guess.
+  const defaultPart =
+    channel === 'call'
+      ? 'weekday-day'
+      : channel === 'email'
+        ? rng.pick(['weekday-day', 'weekday-evening'])
+        : 'weekday-evening'
+  return {
+    window: rng.pick(WINDOWS_BY_DAYPART[defaultPart] ?? WINDOWS),
+    reason: `Too little contact history to bucket — defaulted to a ${channel}-appropriate window`,
+  }
+}
 
 /**
  * Which touchpoints a lead has actually reached.
@@ -146,12 +264,20 @@ function propensityFor(rng: Rng, lead: Lead, fatigue: number) {
   return Math.max(4, Math.min(96, Math.round(base + rng.float(-6, 6))))
 }
 
-function signalsFor(lead: Lead, touchpoint: TouchpointId, fatigue: number) {
+function signalsFor(
+  lead: Lead,
+  touchpoint: TouchpointId,
+  fatigue: number,
+  channelReason?: string,
+  windowReason?: string,
+) {
   const out = [
     `Last activity ${lead.evidence.daysSinceLastActivity} day(s) ago`,
     `${lead.evidence.whatsappReplies} WhatsApp repl(ies), ${lead.evidence.emailOpens} email open(s) logged`,
     `Reached the ${touchpoint.replace('-', ' ')} touchpoint at stage "${lead.stage}"`,
   ]
+  if (channelReason) out.push(channelReason)
+  if (windowReason) out.push(windowReason)
   if (fatigue > 0) out.push(`${fatigue} survey(s) already sent in 90 days`)
   return out
 }
@@ -243,11 +369,12 @@ export function buildFeedback(input: {
   siteVisits: SiteVisit[]
   serviceTickets: ServiceTicket[]
   payments: Payment[]
+  engagements: Engagement[]
   seed?: number
 }): FeedbackDataset {
   const rng = new Rng(input.seed ?? FEEDBACK_SEED)
 
-  const { leads, bookings, siteVisits, serviceTickets, payments } = input
+  const { leads, bookings, siteVisits, serviceTickets, payments, engagements } = input
   const leadsById = new Map(leads.map((l) => [l.id, l]))
 
   const bookedLeadIds = new Set(bookings.map((b) => b.leadId))
@@ -267,6 +394,13 @@ export function buildFeedback(input: {
   const overdueLeadIds = new Set(
     payments.filter((p) => p.status === 'overdue').map((p) => p.leadId),
   )
+
+  const engagementsByLead = new Map<string, Engagement[]>()
+  for (const e of engagements) {
+    const list = engagementsByLead.get(e.leadId)
+    if (list) list.push(e)
+    else engagementsByLead.set(e.leadId, [e])
+  }
 
   const surveyInvites: SurveyInvite[] = []
   const surveyResponses: SurveyResponse[] = []
@@ -349,8 +483,14 @@ export function buildFeedback(input: {
       featured: true,
     })
 
+    const authoredRespondedAt = atHour(
+      response.respondedAt,
+      replyHourFor(lead.id, i, response.channel),
+    )
+
     surveyResponses.push({
       ...response,
+      respondedAt: authoredRespondedAt,
       id: `res-f${i}`,
       inviteId,
       customerName: lead.name,
@@ -383,7 +523,19 @@ export function buildFeedback(input: {
     touchpoints.forEach((touchpoint, tIdx) => {
       const id = `inv-${lead.id}-${tIdx}`
       const propensity = propensityFor(rng, lead, fatigue)
-      const channel = rng.pick(CHANNELS)
+
+      // Predict once per invite: the channel this lead is reachable on, and
+      // the window their own history shows them being contactable in. Every
+      // branch below reuses the same pair — a suppressed invite gets no
+      // window recommendation, but it still gets a real channel.
+      const { channel, reason: channelReason } = channelFor(rng, lead)
+      const { window, reason: windowReason } = windowFor(
+        rng,
+        channel,
+        engagementsByLead.get(lead.id) ?? [],
+      )
+      const signals = signalsFor(lead, touchpoint, fatigue, channelReason, windowReason)
+
       // Spans the full six-month trend window. At 120 days the two earliest
       // buckets held no responses and the chart opened on a flat zero line,
       // which reads as broken data rather than as a young feedback programme.
@@ -414,7 +566,7 @@ export function buildFeedback(input: {
           eligible: false,
           suppressedLabel: suppression.label,
           suppressedReason: suppression.reason,
-          signals: signalsFor(lead, touchpoint, fatigue),
+          signals,
         })
         return
       }
@@ -431,9 +583,9 @@ export function buildFeedback(input: {
           status: 'queued',
           responsePropensity: propensity,
           fatigueScore: fatigue,
-          recommendedWindow: rng.pick(WINDOWS),
+          recommendedWindow: window,
           eligible: true,
-          signals: signalsFor(lead, touchpoint, fatigue),
+          signals,
         })
         return
       }
@@ -453,14 +605,17 @@ export function buildFeedback(input: {
           status: rng.chance(0.45) ? 'abandoned' : 'expired',
           responsePropensity: propensity,
           fatigueScore: fatigue,
-          recommendedWindow: rng.pick(WINDOWS),
+          recommendedWindow: window,
           eligible: true,
-          signals: signalsFor(lead, touchpoint, fatigue),
+          signals,
         })
         return
       }
 
-      const respondedAt = isoDaysBefore(Math.max(0, daysAgo - rng.int(1, 3)))
+      const respondedAt = atHour(
+        isoDaysBefore(Math.max(0, daysAgo - rng.int(1, 3))),
+        replyHourFor(lead.id, tIdx, channel),
+      )
       const sentiment = sentimentFor(rng, touchpoint)
       const npsScore = npsFor(rng, sentiment)
       const projectId =
@@ -480,9 +635,9 @@ export function buildFeedback(input: {
         status: 'responded',
         responsePropensity: propensity,
         fatigueScore: fatigue,
-        recommendedWindow: rng.pick(WINDOWS),
+        recommendedWindow: window,
         eligible: true,
-        signals: signalsFor(lead, touchpoint, fatigue),
+        signals,
       })
 
       surveyResponses.push({

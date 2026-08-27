@@ -533,3 +533,32 @@ export const VERBATIM_POOLS: Record<TouchpointId, Record<Sentiment, string[]>> =
       ],
     },
   }
+
+/**
+ * Follow-ups fire on the answer, not on the customer — that is the point.
+ *
+ * Lives in the data layer because two screens ask the same question of it: the
+ * journey composer shows the whole branch set, and the engagement engine shows
+ * the one branch a given score band would take.
+ */
+export const CONDITIONAL_FOLLOW_UPS: {
+  band: NpsBand
+  when: string
+  ask: string
+}[] = [
+  {
+    band: 'detractor',
+    when: 'Score 0-6 (detractor)',
+    ask: 'What one thing would have made this better? A recovery case is opened for review.',
+  },
+  {
+    band: 'passive',
+    when: 'Score 7-8 (passive)',
+    ask: 'What would have made this a 9 or 10?',
+  },
+  {
+    band: 'promoter',
+    when: 'Score 9-10 (promoter)',
+    ask: 'Would you be willing to refer a friend or colleague?',
+  },
+]

@@ -1,7 +1,10 @@
-import { THEME_DEFS, THEME_DEFS_BY_ID } from '@/data/feedback'
-import { DEMO_NOW } from '@/data/reference'
+import { SURVEY_QUESTIONS, THEME_DEFS, THEME_DEFS_BY_ID } from '@/data/feedback'
+import { DEMO_NOW, dayPartOf } from '@/data/reference'
+import { PERSONAS } from '@/data/personas'
 import type {
   FeedbackTheme,
+  Lead,
+  SurveyQuestion,
   Intervention,
   JourneyStage,
   NpsBand,
@@ -1017,3 +1020,120 @@ export function selectSatisfactionByProject(
 
 /** Band counts for the Type 1 promoter/passive/detractor split chart. */
 export const NPS_BAND_ORDER: NpsBand[] = ['promoter', 'passive', 'detractor']
+
+/**
+ * The question set for one customer at one touchpoint.
+ *
+ * Locked questions always appear. Supporting questions qualify on touchpoint,
+ * then on journey stage and persona where the library declares them — which is
+ * what makes the survey specific to this customer rather than generic.
+ *
+ * Pure and React-free so the journey composer and the engagement engine run
+ * the same selection rather than two copies that can drift apart.
+ */
+export function composeQuestions(
+  lead: Pick<Lead, 'stage'> | undefined,
+  touchpoint: TouchpointId,
+  personaId: string | undefined,
+): SurveyQuestion[] {
+  if (!lead) return []
+  return SURVEY_QUESTIONS.filter((q) => {
+    if (!q.touchpoints.includes(touchpoint)) return false
+    if (q.journeyStages && !q.journeyStages.includes(lead.stage)) return false
+    if (q.personaIds && !q.personaIds.includes(personaId ?? '')) return false
+    return true
+  })
+}
+
+/* ---------- Outcome measures ---------- */
+
+/** Display names for the survey channels, for the outcome tallies. */
+const SURVEY_CHANNEL_LABEL: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  email: 'Email',
+  sms: 'SMS',
+  call: 'Call',
+  'in-app': 'In-app',
+}
+
+/**
+ * Broader representation.
+ *
+ * The point of predicting who to ask is not a higher response count, it is a
+ * less lopsided one — a programme can lift its response rate and still only
+ * ever hear from the same segment. This compares who answered against who was
+ * actually asked, so the gap is measured against the addressable book rather
+ * than against an abstract ideal.
+ */
+export function selectRepresentation(
+  invites: SurveyInvite[],
+  responses: SurveyResponse[],
+  personaLabel: (id: string) => string,
+) {
+  const askedStages = new Set(invites.filter((i) => i.sentAt).map((i) => i.journeyStage))
+  const heardStages = new Set(responses.map((r) => r.journeyStage))
+
+  const askedPersonas = new Set(PERSONAS.map((p) => p.id))
+  const heardPersonas = new Set(
+    responses.map((r) => r.personaId).filter((id): id is string => Boolean(id)),
+  )
+
+  const missingStages = [...askedStages].filter((x) => !heardStages.has(x))
+  const missingPersonas = [...askedPersonas].filter((x) => !heardPersonas.has(x))
+
+  return {
+    personasHeard: heardPersonas.size,
+    personasAsked: askedPersonas.size,
+    stagesHeard: heardStages.size,
+    stagesAsked: askedStages.size,
+    // Named so the gap is actionable rather than just a fraction.
+    missingPersonaLabels: missingPersonas.map(personaLabel),
+    missingStages,
+  }
+}
+
+/**
+ * Response knowledge — who responds, when, and through which channel.
+ *
+ * Reads only rows that actually came back, so it reports observed behaviour
+ * rather than restating the predictions that produced the invites. That
+ * distinction is the whole value of the measure: it is the feedback loop on
+ * the engine, and it would be worthless if it simply echoed the model.
+ */
+export function selectResponseKnowledge(
+  responses: SurveyResponse[],
+  personaLabel: (id: string) => string,
+) {
+  const tally = (rows: string[]) => {
+    const counts = new Map<string, number>()
+    for (const key of rows) counts.set(key, (counts.get(key) ?? 0) + 1)
+    return [...counts.entries()]
+      .map(([label, count]) => ({
+        label,
+        count,
+        pct: rows.length ? Math.round((count / rows.length) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+  }
+
+  const DAY_PART_LABEL: Record<string, string> = {
+    'weekday-day': 'Weekday daytime',
+    'weekday-evening': 'Weekday evening',
+    'weekend-day': 'Weekend daytime',
+    'weekend-evening': 'Weekend evening',
+  }
+
+  return {
+    total: responses.length,
+    byChannel: tally(responses.map((r) => SURVEY_CHANNEL_LABEL[r.channel] ?? r.channel)),
+    byDayPart: tally(
+      responses.map((r) => DAY_PART_LABEL[dayPartOf(r.respondedAt)] ?? 'Unknown'),
+    ),
+    byPersona: tally(
+      responses
+        .map((r) => r.personaId)
+        .filter((id): id is string => Boolean(id))
+        .map(personaLabel),
+    ),
+  }
+}

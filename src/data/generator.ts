@@ -10,6 +10,8 @@ import {
   OCCUPATIONS,
   PROJECTS,
   REPS,
+  atHour,
+  stableIndex,
 } from './reference'
 import type {
   Booking,
@@ -102,6 +104,40 @@ function isoDaysBefore(days: number) {
 
 function round2(n: number) {
   return Math.round(n * 100) / 100
+}
+
+/**
+ * Hour of day for a logged contact.
+ *
+ * DEMO_NOW carries a time and isoDaysBefore subtracts whole days, so every
+ * engagement inherited the same 10:30 and the record held no time-of-day
+ * signal at all. Anything downstream that claims to read *when* a customer is
+ * reachable was therefore reading a constant.
+ *
+ * The hour is derived from ids already on the record rather than drawn from
+ * the rng: the lead generator's sequence is load-bearing for the headline
+ * funnel figures, and consuming even one extra draw here would shift every
+ * number after it. Same input, same hour, no draw taken.
+ */
+const CONTACT_HOURS: Record<EngagementChannel, number[]> = {
+  // Reps dial during the working day; almost never after dinner.
+  call: [10, 11, 12, 14, 15, 16, 17, 18],
+  // Read on the commute and after the kids are down.
+  whatsapp: [9, 13, 18, 19, 20, 20, 21, 21],
+  email: [9, 10, 11, 15, 19, 20, 21, 22],
+  // Browsing is a late-evening habit.
+  website: [13, 19, 20, 21, 22, 22, 23, 8],
+  // Site visits are daylight, and mostly at the weekend.
+  'site-visit': [10, 11, 11, 12, 15, 16, 16, 17],
+}
+
+function contactHourFor(
+  leadId: string,
+  serial: number,
+  channel: EngagementChannel,
+) {
+  const pool = CONTACT_HOURS[channel]
+  return pool[stableIndex(leadId, serial, pool.length)]
 }
 
 /** Splits a total into per-stage bucket counts for one campaign. */
@@ -219,7 +255,16 @@ export function buildSeedDataset(): SeedDataset {
     featuredByBucket.set(key, (featuredByBucket.get(key) ?? 0) + 1)
 
     profile.engagements.forEach((e, i) => {
-      engagements.push({ ...e, id: `eng-f${pIdx}-${i}`, leadId: lead.id })
+      // Authored records are written with daysBefore(), which inherits
+      // DEMO_NOW's 10:30 — the same flat time the generated ones used to
+      // carry. The hero cohort is the most likely thing on screen, so it
+      // gets a real hour by the same derivation rather than a constant.
+      engagements.push({
+        ...e,
+        id: `eng-f${pIdx}-${i}`,
+        leadId: lead.id,
+        occurredAt: atHour(e.occurredAt, contactHourFor(lead.id, i, e.channel)),
+      })
     })
 
     profile.siteVisits?.forEach((v, i) => {
@@ -609,7 +654,10 @@ export function buildSeedDataset(): SeedDataset {
         subject: template.subject,
         summary: template.summary,
         durationMins: channel === 'call' ? rng.int(2, 14) : undefined,
-        occurredAt: isoDaysBefore(daysAgo),
+        occurredAt: atHour(
+          isoDaysBefore(daysAgo),
+          contactHourFor(lead.id, engagementSerial, channel),
+        ),
       })
 
       daysAgo += rng.int(4, 26)
@@ -711,6 +759,7 @@ export function buildSeedDataset(): SeedDataset {
     siteVisits,
     serviceTickets,
     payments,
+    engagements,
   })
 
   return {

@@ -1,13 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CornerDownRight, MessageCircle, Users } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { StagePill } from '@/components/shared/pills'
 import { HumanReviewNote, IllustrativeBadge, LockedQuestionBadge } from './guardrails'
-import { SURVEY_QUESTIONS } from '@/data/feedback'
+import { CONDITIONAL_FOLLOW_UPS } from '@/data/feedback'
+import { composeQuestions } from '@/lib/selectors/feedback'
 import { PERSONAS_BY_ID } from '@/data/personas'
 import { usePersonaFor } from '@/lib/personas/use-persona-map'
 import { useCrmStore } from '@/store/crm-store'
@@ -61,36 +62,45 @@ const CHANNEL_COPY: Record<SurveyChannel, { label: string; guidance: string }> =
   },
 }
 
-/** Follow-ups fire on the answer, not on the customer — that is the point. */
-const CONDITIONAL_FOLLOW_UPS: { when: string; ask: string }[] = [
-  {
-    when: 'Score 0-6 (detractor)',
-    ask: 'What one thing would have made this better? A recovery case is opened for review.',
-  },
-  {
-    when: 'Score 7-8 (passive)',
-    ask: 'What would have made this a 9 or 10?',
-  },
-  {
-    when: 'Score 9-10 (promoter)',
-    ask: 'Would you be willing to refer a friend or colleague?',
-  },
-]
-
 export function FeedbackJourney() {
   const leads = useCrmStore((s) => s.leads)
 
   /* The authored profiles are the ones with a full journey to compose against. */
-  const featured = useMemo(
+  const authored = useMemo(
     () => leads.filter((l) => l.featured).slice(0, 6),
     [leads],
   )
 
-  const [leadId, setLeadId] = useState(featured[0]?.id ?? '')
+  const [leadId, setLeadId] = useState(authored[0]?.id ?? '')
+
+  /*
+   * Deep link from the engagement engine's "Compose in full" action.
+   *
+   * Read in an effect rather than during render: the query string is not
+   * available on the server, and seeding useState from it directly would make
+   * the first client render disagree with the server's.
+   */
+  useEffect(() => {
+    const target = new URLSearchParams(window.location.search).get('lead')
+    if (target && leads.some((l) => l.id === target)) setLeadId(target)
+  }, [leads])
+
+  /*
+   * The engine links here for whoever is in the survey queue, and that is
+   * almost never one of the six authored profiles. Without adding the arriving
+   * customer to the options the select would hold a value none of its options
+   * carried, so the control would show the wrong name while the panels beside
+   * it composed for the right one.
+   */
+  const featured = useMemo(() => {
+    const arrived = leads.find((l) => l.id === leadId)
+    if (!arrived || authored.some((l) => l.id === leadId)) return authored
+    return [arrived, ...authored]
+  }, [authored, leads, leadId])
   const [touchpoint, setTouchpoint] = useState<TouchpointId>('site-visit')
   const [channel, setChannel] = useState<SurveyChannel>('whatsapp')
 
-  const lead = leads.find((l) => l.id === leadId) ?? featured[0]
+  const lead = leads.find((l) => l.id === leadId) ?? authored[0]
   const assignment = usePersonaFor(leadId)
   const persona = assignment ? PERSONAS_BY_ID[assignment.best.personaId] : undefined
 
@@ -101,16 +111,10 @@ export function FeedbackJourney() {
    * then on journey stage and persona where the library declares them — which
    * is what makes the survey specific to this customer rather than generic.
    */
-  const composed = useMemo(() => {
-    if (!lead) return []
-    return SURVEY_QUESTIONS.filter((q) => {
-      if (!q.touchpoints.includes(touchpoint)) return false
-      if (q.journeyStages && !q.journeyStages.includes(lead.stage)) return false
-      if (q.personaIds && !q.personaIds.includes(assignment?.best.personaId ?? ''))
-        return false
-      return true
-    })
-  }, [lead, touchpoint, assignment])
+  const composed = useMemo(
+    () => composeQuestions(lead, touchpoint, assignment?.best.personaId),
+    [lead, touchpoint, assignment],
+  )
 
   if (!lead) return null
 
