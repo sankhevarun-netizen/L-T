@@ -354,6 +354,13 @@ const detractorRecoveryAgent = defineAgent({
       const lead = ctx.leads.find((l) => l.id === f.leadId)
       const slaDays = (response?.npsScore ?? 5) <= 2 ? 2 : 5
 
+      // The theme this specific response belongs to, not a blank id — a blank
+      // id meant every case the agent opened showed no theme label anywhere
+      // downstream, including in the activity feed and on the case itself.
+      const theme = response
+        ? ctx.feedbackThemes.find((t) => t.responseIds.includes(response.id))
+        : undefined
+
       return plan(
         'agent-detractor-recovery',
         f,
@@ -368,7 +375,7 @@ const detractorRecoveryAgent = defineAgent({
           leadId: f.leadId!,
           ownerId: lead?.ownerId ?? REPS[0].id,
           severity: f.severity,
-          themeId: '',
+          themeId: theme?.id ?? '',
           slaDays,
           recommendedResponse:
             'Acknowledge the delay, name a single owner, and commit to a dated next step in writing.',

@@ -4,9 +4,11 @@ import { create } from 'zustand'
 
 import { buildSeedDataset } from '@/data/generator'
 import { DATA_SOURCE_SEEDS, buildFeedback } from '@/data/feedback-generator'
-import { DEMO_NOW } from '@/data/reference'
+import { DEMO_NOW, REPS } from '@/data/reference'
+import { THEME_DEFS_BY_ID } from '@/data/feedback'
 import type {
   Booking,
+  TouchpointId,
   Customer,
   Engagement,
   Lead,
@@ -20,6 +22,7 @@ import type {
   SurveyResponse,
   Transcript,
 } from '@/types'
+import { TOUCHPOINT_LABEL } from '@/types'
 
 /**
  * The in-memory Salesforce stand-in.
@@ -145,6 +148,42 @@ export interface CrmState {
    * the exact mislabelling the standing notice exists to prevent.
    */
   resetDemoData: (source?: 'example' | 'client') => void
+}
+
+
+/**
+ * One line for the activity feed, specific to the case rather than to its
+ * severity band. Falls back gracefully if the source response is missing.
+ */
+function recoveryCaseDetail(
+  recoveryCase: RecoveryCase,
+  response: SurveyResponse | undefined,
+): string {
+  const owner = REPS.find((r) => r.id === recoveryCase.ownerId)?.name ?? 'Customer Care'
+
+  /*
+   * Leads with a quoted fragment of the verbatim, not the theme. The theme
+   * repeats across the top of the queue by construction — the same complaint
+   * genuinely is the dominant one — so a feed built from theme + touchpoint
+   * still collapsed to a handful of lines for the worst detractors. The
+   * customer's own words are unique per response, which is also the standard
+   * the rest of this feature already holds evidence to.
+   */
+  const quote = response
+    ? `"${response.verbatim.slice(0, 64)}${response.verbatim.length > 64 ? '…' : ''}"`
+    : THEME_DEFS_BY_ID[recoveryCase.themeId]?.label ?? `${recoveryCase.severity} severity`
+
+  const touchpoint = response
+    ? TOUCHPOINT_LABEL[response.touchpoint as TouchpointId]
+    : undefined
+
+  const sla = Math.round(
+    (new Date(recoveryCase.slaDueAt).getTime() -
+      new Date(recoveryCase.openedAt).getTime()) /
+      86_400_000,
+  )
+
+  return `${quote}${touchpoint ? ` · ${touchpoint}` : ''} · SLA ${sla}d · owner ${owner}`
 }
 
 function seedState(source: 'example' | 'client' = 'example') {
@@ -379,6 +418,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     recoverySeq += 1
     const response = get().surveyResponses.find((r) => r.id === input.responseId)
     const name = response?.customerName ?? input.leadId
+    const owner = REPS.find((r) => r.id === input.ownerId)?.name ?? 'Customer Care'
 
     const recoveryCase: RecoveryCase = {
       id: nextId('REC-NEW', recoverySeq),
@@ -394,7 +434,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       ).toISOString(),
       status: 'open',
       recommendedResponse: input.recommendedResponse,
-      escalationPath: ['Owner', 'Customer Care lead', 'Head of CX'],
+      escalationPath: [owner, 'Customer Care lead', 'Head of CX'],
       timeline: [
         {
           at: DEMO_NOW.toISOString(),
@@ -415,7 +455,11 @@ export const useCrmStore = create<CrmState>((set, get) => ({
           recordId: recoveryCase.id,
           recordName: name,
           action: 'Recovery case opened',
-          detail: `${input.severity} severity · SLA ${input.slaDays} day(s)`,
+          // Names the actual theme, touchpoint and owner rather than repeating
+          // severity and SLA — those two are tightly correlated (severity
+          // decides the SLA), so a feed built from only them collapses to the
+          // same line for every critical case regardless of who it is about.
+          detail: recoveryCaseDetail(recoveryCase, response),
           source: 'DICE' as const,
           at: DEMO_NOW.toISOString(),
         },
