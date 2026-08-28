@@ -58,6 +58,47 @@ export const DATA_SOURCE_SEEDS: Record<'example' | 'client', number> = {
   client: 20260714,
 }
 
+/**
+ * The projects the feedback programme actually runs on.
+ *
+ * Six of the seventeen, the rest held in reserve. This narrows the feedback
+ * book only — PROJECTS itself is untouched, so lead generation and its
+ * micro-market coverage are unaffected and the headline funnel figures hold. A
+ * shorter PROJECTS array would leave more markets without a project, fire the
+ * fallback draw more often, and move every number after it.
+ *
+ * Four slots are pinned. The authored records in feedback.ts are written
+ * against these projects and inject ahead of generated volume, so excluding
+ * one would put a seventh name in the charts and defeat the point. Only the
+ * remaining two genuinely rotate — worth being straight about rather than
+ * implying the whole set reshuffles.
+ *
+ * Selection is derived from the seed rather than drawn from the rng, so it
+ * costs no draws; shuffleFeedback and setFeedbackSource already vary the seed,
+ * which rotates the two open slots for free.
+ */
+const ANCHOR_PROJECT_IDS = [
+  'prj-serein',
+  'prj-eureka-park',
+  'prj-dream-acres',
+  'prj-royal-pavilion',
+]
+
+const ACTIVE_PROJECT_COUNT = 6
+
+function activeProjectsFor(seed: number): Set<string> {
+  const active = new Set(ANCHOR_PROJECT_IDS)
+  const reserves = PROJECTS.map((p) => p.id).filter((id) => !active.has(id))
+
+  for (let i = 0; active.size < ACTIVE_PROJECT_COUNT && reserves.length; i += 1) {
+    // Salted per slot so the two picks differ from one another, not just
+    // between seeds.
+    const [pick] = reserves.splice(stableIndex(String(seed), i, reserves.length), 1)
+    active.add(pick)
+  }
+  return active
+}
+
 /** Target share of sent invites that come back. */
 const RESPONSE_RATE = 0.39
 
@@ -380,7 +421,9 @@ export function buildFeedback(input: {
   engagements: Engagement[]
   seed?: number
 }): FeedbackDataset {
-  const rng = new Rng(input.seed ?? FEEDBACK_SEED)
+  const seed = input.seed ?? FEEDBACK_SEED
+  const rng = new Rng(seed)
+  const activeProjects = activeProjectsFor(seed)
 
   const { leads, bookings, siteVisits, serviceTickets, payments, engagements } = input
   const leadsById = new Map(leads.map((l) => [l.id, l]))
@@ -525,6 +568,15 @@ export function buildFeedback(input: {
     )
     if (touchpoints.length === 0) continue
 
+    /*
+     * Skip before the first draw, not inside the touchpoint loop: bailing out
+     * mid-sequence would leave the rng half-advanced for this lead and make the
+     * rest of the book depend on which leads were filtered.
+     */
+    const leadProjectId =
+      projectByLead.get(lead.id) ?? lead.interestedProjectIds[0] ?? PROJECTS[0].id
+    if (!activeProjects.has(leadProjectId)) continue
+
     // Fatigue is a property of the customer, not of any one invite.
     const fatigue = rng.chance(0.12) ? rng.int(2, 4) : rng.int(0, 1)
 
@@ -632,10 +684,7 @@ export function buildFeedback(input: {
       )
       const sentiment = sentimentFor(rng, touchpoint)
       const npsScore = npsFor(rng, sentiment)
-      const projectId =
-        projectByLead.get(lead.id) ??
-        lead.interestedProjectIds[0] ??
-        PROJECTS[0].id
+      const projectId = leadProjectId
 
       surveyInvites.push({
         id,
