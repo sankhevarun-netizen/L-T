@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronDown,
   CircleCheck,
+  Database,
   Gauge,
   Play,
   RotateCcw,
@@ -24,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { HERO_LEAD_ID } from '@/lib/selectors/use-overview-data'
+import { formatNumber } from '@/lib/format'
 import { useCrmStore } from '@/store/crm-store'
 import { useSettingsStore } from '@/store/settings-store'
 import { cn } from '@/lib/utils'
@@ -48,7 +50,36 @@ export function DemoMenu() {
   const liveAvailable = useSettingsStore((s) => s.liveAvailable)
   const probe = useSettingsStore((s) => s.probeLiveAvailability)
 
+  const leads = useCrmStore((s) => s.leads)
+  const ingestedLeadIds = useCrmStore((s) => s.ingestedLeadIds)
+  const ingestSanitizedData = useCrmStore((s) => s.ingestSanitizedData)
+
   const [justReset, setJustReset] = useState(false)
+  const [justIngested, setJustIngested] = useState(0)
+
+  /*
+   * One EAI batch.
+   *
+   * The store already had ingestSanitizedData and the activity-feed entry that
+   * goes with it, but nothing ever called them — the ingestion story was
+   * visible on the architecture diagram and unreachable in the product. This
+   * gives it the entry point it was missing.
+   *
+   * Ingested leads become eligible for DICE reasoning, so a batch genuinely
+   * changes what Next Best Action has to work with rather than only writing a
+   * log line.
+   */
+  const INGEST_BATCH = 1000
+  const ingestedSet = new Set(ingestedLeadIds)
+  const pending = leads.filter((l) => !ingestedSet.has(l.id))
+
+  function handleIngest() {
+    const batch = pending.slice(0, INGEST_BATCH).map((l) => l.id)
+    if (!batch.length) return
+    ingestSanitizedData(batch)
+    setJustIngested(batch.length)
+    setTimeout(() => setJustIngested(0), 2400)
+  }
 
   // Ask the server once whether a key is configured.
   useEffect(() => {
@@ -76,6 +107,13 @@ export function DemoMenu() {
           className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700"
         >
           Variant {feedbackVariant}
+        </span>
+      )}
+
+      {justIngested > 0 && (
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-kpmg-teal">
+          <CircleCheck className="size-3" />
+          {formatNumber(justIngested)} records ingested
         </span>
       )}
 
@@ -163,6 +201,32 @@ export function DemoMenu() {
                 : 'Reading the example book. Switch to compare the same screens against a different feed.'}
             </p>
           </div>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuLabel>Data ingestion</DropdownMenuLabel>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              // onSelect, not onClick: Radix closes the menu on select, so
+              // preventing the click does nothing. Kept open on purpose — the
+              // count updates in place, and a menu that vanishes on the batch
+              // looks like nothing happened.
+              e.preventDefault()
+              handleIngest()
+            }}
+            disabled={pending.length === 0}
+          >
+            <Database />
+            {pending.length === 0
+              ? 'All records ingested'
+              : `Ingest new data (${formatNumber(Math.min(INGEST_BATCH, pending.length))} records)`}
+          </DropdownMenuItem>
+          <p className="px-2 pb-1.5 pt-0.5 text-[10.5px] leading-snug text-slate-400">
+            {formatNumber(ingestedLeadIds.length)} of {formatNumber(leads.length)}{' '}
+            records cleaned and written to Salesforce through the EAI layer. Each
+            batch is logged to the CRM activity feed, and ingested records become
+            eligible for DICE reasoning.
+          </p>
 
           <DropdownMenuSeparator />
 

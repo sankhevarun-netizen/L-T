@@ -389,7 +389,11 @@ export const useCrmStore = create<CrmState>((set, get) => ({
    */
   ingestSanitizedData: (leadIds) =>
     set((state) => {
-      const fresh = leadIds.filter((id) => !state.ingestedLeadIds.includes(id))
+      // Set lookup, not includes(): nothing called this until the demo menu
+      // gained an Ingest action, and a batch checked against a list that
+      // grows to 12k would be O(n*m) on every click.
+      const already = new Set(state.ingestedLeadIds)
+      const fresh = leadIds.filter((id) => !already.has(id))
       if (!fresh.length) return state
 
       activitySeq += 1
