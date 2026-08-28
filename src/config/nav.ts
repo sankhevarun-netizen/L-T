@@ -17,6 +17,7 @@ import {
   Sparkles,
   UsersRound,
   Wallet,
+  DatabaseZap,
   Workflow,
   type LucideIcon,
 } from 'lucide-react'
@@ -56,6 +57,14 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'DICE Platform',
         subtitle:
           'Sources to experience — and what DICE adds on top of Agentforce.',
+      },
+      {
+        label: 'Data Ingestion',
+        href: '/data-ingestion',
+        icon: DatabaseZap,
+        title: 'Data Ingestion',
+        subtitle:
+          'Pull a batch from a source system and watch EAI and sanitization run on it.',
       },
     ],
   },
