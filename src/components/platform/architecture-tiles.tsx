@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Layers3 } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 
 import { ARCHITECTURES } from './architectures'
 
@@ -10,16 +10,15 @@ import { ARCHITECTURES } from './architectures'
  * below the fold and sharing width with an outcomes rail. Each one now gets a
  * tile here and the whole page to itself when opened.
  *
- * The figures on a tile are folded from that architecture's own data, so a
- * tile cannot claim coverage the diagram behind it does not show.
+ * The chips state plain facts about the diagram's own structure — a slide
+ * reproduction has no build-coverage figure to report, and reusing the old
+ * "N of M in this build" chip here would have invented one.
  */
 export function ArchitectureTiles() {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {ARCHITECTURES.map((architecture) => {
         const Icon = architecture.icon
-        const { layers, built, total } = architecture.summary
-
         return (
           <Link
             key={architecture.slug}
@@ -39,14 +38,15 @@ export function ArchitectureTiles() {
               {architecture.blurb}
             </p>
 
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-slate-100 pt-2.5">
-              <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                <Layers3 className="size-3.5 text-slate-400" strokeWidth={2.1} />
-                <span className="nums">{layers}</span> layers
-              </span>
-              <span className="nums rounded-full bg-kpmg-teal/10 px-2 py-0.5 text-[10.5px] font-semibold text-kpmg-teal">
-                {built} of {total} in this build
-              </span>
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-100 pt-2.5">
+              {architecture.facts.map((fact) => (
+                <span
+                  key={fact}
+                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600"
+                >
+                  {fact}
+                </span>
+              ))}
               <span className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-kpmg-blue">
                 Open
                 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />

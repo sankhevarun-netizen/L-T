@@ -1,6 +1,6 @@
-import { Network, type LucideIcon } from 'lucide-react'
+import { MessagesSquare, type LucideIcon } from 'lucide-react'
 
-import { summariseCrmArchitecture } from './crm-architecture'
+import { FeedbackIntelligenceSlide } from './feedback-intelligence-slide'
 
 /**
  * The reference architectures this build can show.
@@ -16,19 +16,21 @@ export interface ArchitectureEntry {
   shortName: string
   blurb: string
   icon: LucideIcon
-  /** Counts folded from the diagram itself, so a tile cannot drift from it. */
-  summary: { layers: number; built: number; total: number }
+  /** Descriptive chips for the tile. Plain facts about the diagram itself. */
+  facts: string[]
+  Component: () => React.JSX.Element
 }
 
 export const ARCHITECTURES: ArchitectureEntry[] = [
   {
-    slug: 'crm-architecture',
-    name: 'CRM-Centric AI Enablement Architecture',
-    shortName: 'CRM-Centric AI Enablement',
+    slug: 'feedback-intelligence',
+    name: 'Customer Feedback Intelligence',
+    shortName: 'Customer Feedback Intelligence',
     blurb:
-      'The full target stack for customer lifecycle management, from interaction channels down to the data foundation — and which parts of it this build actually demonstrates.',
-    icon: Network,
-    summary: summariseCrmArchitecture(),
+      'Strengthening Voice-of-Customer insights: current challenges and existing data feeding the KPMG SPAR AI Engine, and the participation outcomes it is meant to produce.',
+    icon: MessagesSquare,
+    facts: ['4-stage flow', 'SPAR engine', '5-step pathway'],
+    Component: FeedbackIntelligenceSlide,
   },
 ]
 
