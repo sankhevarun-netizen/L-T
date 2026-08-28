@@ -370,7 +370,7 @@ export const FEATURED_RESPONSES: FeaturedResponse[] = [
   {
     leadId: 'MRD-79603', // Ritu Sen — the NPS 4 detractor
     touchpoint: 'documentation',
-    projectId: 'prj-skyline',
+    projectId: 'prj-serein',
     npsScore: 4,
     csatScore: 2,
     verbatim:
@@ -383,7 +383,7 @@ export const FEATURED_RESPONSES: FeaturedResponse[] = [
   {
     leadId: 'MRD-79540', // Sanya Kapoor — the promoter
     touchpoint: 'sales',
-    projectId: 'prj-harbour',
+    projectId: 'prj-eureka-park',
     npsScore: 9,
     csatScore: 5,
     verbatim:
@@ -398,7 +398,7 @@ export const FEATURED_RESPONSES: FeaturedResponse[] = [
   {
     leadId: 'MRD-79318', // Rohit Mehta
     touchpoint: 'documentation',
-    projectId: 'prj-highgrove',
+    projectId: 'prj-dream-acres',
     npsScore: 7,
     csatScore: 3,
     verbatim:
@@ -411,7 +411,7 @@ export const FEATURED_RESPONSES: FeaturedResponse[] = [
   {
     leadId: 'MRD-79455', // Arjun Nair
     touchpoint: 'sales',
-    projectId: 'prj-greens',
+    projectId: 'prj-royal-pavilion',
     npsScore: 6,
     csatScore: 3,
     verbatim:
@@ -424,7 +424,7 @@ export const FEATURED_RESPONSES: FeaturedResponse[] = [
   {
     leadId: 'MRD-79641', // Aditya Ranade
     touchpoint: 'site-visit',
-    projectId: 'prj-greens',
+    projectId: 'prj-royal-pavilion',
     npsScore: 6,
     csatScore: 3,
     verbatim:

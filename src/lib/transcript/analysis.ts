@@ -66,7 +66,7 @@ const ENTITY_RULES: { label: string; pattern: RegExp; format?: (m: RegExpMatchAr
     // name in the rep's opening line.
     label: 'Project',
     pattern:
-      /(?:Meridian\s+)?(Aurelia|Skyline|Crest|Marina Bay|Highgrove|Greens|Harbour View)/i,
+      /(?:Meridian\s+)?(Forest Edge|Dream Acres|Windsor|Royal Pavilion|Silicon Oasis|Serein|Eureka Park|Primanti|New Haven|Promont|Lakeside Habitat|Falcon City|Waterford|Park Grove|Sunrise Park|Kew Gardens|White Meadows)/i,
     format: (m) => `Meridian ${m[1]}`,
   },
   { label: 'Unit type', pattern: /(\d\s*BHK)/i },

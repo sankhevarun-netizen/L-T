@@ -32,7 +32,7 @@ export const PERSONAS: Persona[] = [
     channels: ['Property portals', 'Organic search', 'WhatsApp'],
     buyingTriggers: ['Marriage', 'Rent hike', 'Job stability', 'Loan pre-approval'],
     preferredProjectTypes: ['1 BHK', '2 BHK', 'Ready to move'],
-    bestFitProjects: ['prj-greens', 'prj-highgrove'],
+    bestFitProjects: ['prj-royal-pavilion', 'prj-dream-acres'],
     playbook:
       'Lead with total cost of ownership and a pre-approved loan tie-up. Compare EMI against current rent, and prioritise ready-to-move inventory to remove possession risk.',
     color: '#005EB8',
@@ -63,7 +63,7 @@ export const PERSONAS: Persona[] = [
       'Sale of existing property',
     ],
     preferredProjectTypes: ['3 BHK', '4 BHK', 'Gated community'],
-    bestFitProjects: ['prj-aurelia', 'prj-crest', 'prj-skyline'],
+    bestFitProjects: ['prj-forest-edge', 'prj-silicon-oasis', 'prj-serein'],
     playbook:
       'Run a side-by-side comparison against their shortlist and lead with possession certainty. Sequence the site visit with the family, and pre-empt the bridging question with a flexible payment plan.',
     color: '#00A3A1',
@@ -94,7 +94,7 @@ export const PERSONAS: Persona[] = [
       'Bonus or liquidity event',
     ],
     preferredProjectTypes: ['1 BHK', '2 BHK', 'High rental-demand corridors'],
-    bestFitProjects: ['prj-harbour', 'prj-highgrove'],
+    bestFitProjects: ['prj-eureka-park', 'prj-dream-acres'],
     playbook:
       'Lead with a yield model, not a lifestyle pitch: rental comparables, absorption rate and the infrastructure timeline. Offer pre-launch allocation and a managed-rental tie-up.',
     color: '#C6007E',
@@ -125,7 +125,7 @@ export const PERSONAS: Persona[] = [
       'NRI-specific offer window',
     ],
     preferredProjectTypes: ['3 BHK', '4 BHK', 'Branded developer stock'],
-    bestFitProjects: ['prj-marina', 'prj-harbour'],
+    bestFitProjects: ['prj-windsor', 'prj-eureka-park'],
     playbook:
       'Never let the journey depend on travel. Lead with a video walkthrough in their timezone, a documented NRI payment route and POA support, plus third-party construction updates.',
     color: '#7C5CD6',
@@ -156,7 +156,7 @@ export const PERSONAS: Persona[] = [
       'Peer purchase in the same tower',
     ],
     preferredProjectTypes: ['4 BHK', 'Penthouse', 'Sea-facing'],
-    bestFitProjects: ['prj-marina', 'prj-skyline', 'prj-aurelia'],
+    bestFitProjects: ['prj-windsor', 'prj-serein', 'prj-forest-edge'],
     playbook:
       'Assign a senior relationship owner and keep the process private and unhurried. Lead with the specific unit — view, floor, customisation — and negotiate on inclusions rather than headline price.',
     color: '#0091DA',
@@ -187,7 +187,7 @@ export const PERSONAS: Persona[] = [
       'Site-office visit',
     ],
     preferredProjectTypes: ['2 BHK', '3 BHK', 'Same project as the referrer'],
-    bestFitProjects: ['prj-crest', 'prj-highgrove', 'prj-greens'],
+    bestFitProjects: ['prj-silicon-oasis', 'prj-dream-acres', 'prj-royal-pavilion'],
     playbook:
       'Respond within the hour — referral trust decays fast. Acknowledge the referrer by name, honour the scheme benefit explicitly, and shortcut straight to inventory selection.',
     color: '#A03FA8',

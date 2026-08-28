@@ -24,8 +24,8 @@ export interface ArchitectureEntry {
 export const ARCHITECTURES: ArchitectureEntry[] = [
   {
     slug: 'feedback-intelligence',
-    name: 'Customer Feedback Intelligence',
-    shortName: 'Customer Feedback Intelligence',
+    name: 'KPMG SPAR AI Engine',
+    shortName: 'KPMG SPAR AI Engine',
     blurb:
       'Strengthening Voice-of-Customer insights: current challenges and existing data feeding the KPMG SPAR AI Engine, and the participation outcomes it is meant to produce.',
     icon: MessagesSquare,
