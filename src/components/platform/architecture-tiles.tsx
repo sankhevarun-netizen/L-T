@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
 import { ARCHITECTURES } from './architectures'
+import { cn } from '@/lib/utils'
 
 /**
  * Reference architectures, as tiles.
@@ -39,16 +40,32 @@ export function ArchitectureTiles() {
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-slate-100 pt-2.5">
-              {architecture.facts.map((fact) => (
-                <span
-                  key={fact}
-                  className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600"
-                >
-                  {fact}
+              {/*
+                A reserved tile says so on its face. Showing the same chips and
+                the same call to action as a populated one would only reveal the
+                difference after a click.
+              */}
+              {architecture.pending ? (
+                <span className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[10.5px] font-semibold text-slate-400">
+                  Awaiting content
                 </span>
-              ))}
-              <span className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-kpmg-blue">
-                Open
+              ) : (
+                architecture.facts.map((fact) => (
+                  <span
+                    key={fact}
+                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-600"
+                  >
+                    {fact}
+                  </span>
+                ))
+              )}
+              <span
+                className={cn(
+                  'ml-auto flex items-center gap-1 text-[11.5px] font-semibold',
+                  architecture.pending ? 'text-slate-400' : 'text-kpmg-blue',
+                )}
+              >
+                {architecture.pending ? 'Reserved' : 'Open'}
                 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
               </span>
             </div>
