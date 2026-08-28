@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { AGENTS } from '@/lib/agents'
 import { cn } from '@/lib/utils'
 
 interface Stage {
@@ -105,7 +106,10 @@ const STAGES: Stage[] = [
     onColor: 'light',
     highlight: true,
     items: [
-      { label: '11 AI agents', icon: Sparkles },
+      // Counted, not typed. This read '11 AI agents' for six agents longer
+      // than it was true, because the CSAT feature added to the registry
+      // without anyone editing the diagram.
+      { label: `${AGENTS.length} AI agents`, icon: Sparkles },
       { label: 'Persona mapping', icon: Layers },
       { label: 'Next best action', icon: Target },
       { label: 'Evidence validation' },

@@ -1,8 +1,10 @@
 'use client'
 
-import { CircleCheck, Info, TriangleAlert, Workflow } from 'lucide-react'
+import { Check, CircleCheck, Info, TriangleAlert, Workflow } from 'lucide-react'
 
 import { ArchitectureDiagram, PIPELINE_NOTE } from './architecture-diagram'
+import { CRM_ARCHITECTURE_NOTE, CrmArchitecture } from './crm-architecture'
+import { SPAR_NOTE, SparFramework } from './spar-framework'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AGENTS, ARCHETYPE_META, type AgentArchetype } from '@/lib/agents'
 import { BRAND } from '@/config/brand'
@@ -89,6 +91,29 @@ export function PlatformPage() {
             />
             <p className="text-[12px] leading-relaxed text-slate-600">
               {PIPELINE_NOTE}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CRM-Centric AI Enablement Architecture */}
+      <Card>
+        <CardHeader>
+          <CardTitle>CRM-Centric AI Enablement Architecture</CardTitle>
+          <p className="shrink-0 text-[11.5px] text-slate-400">
+            Where this build sits inside the full target stack
+          </p>
+        </CardHeader>
+        <CardContent>
+          <CrmArchitecture />
+
+          <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-kpmg-teal/25 bg-kpmg-teal/[0.05] p-3.5">
+            <Check
+              className="mt-0.5 size-4 shrink-0 text-kpmg-teal"
+              strokeWidth={2.4}
+            />
+            <p className="text-[12px] leading-relaxed text-slate-600">
+              {CRM_ARCHITECTURE_NOTE}
             </p>
           </div>
         </CardContent>
@@ -227,6 +252,32 @@ export function PlatformPage() {
                 </div>
               )
             })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* KPMG SPAR AI Engine framework */}
+      <Card>
+        <CardHeader>
+          <CardTitle>KPMG SPAR AI Engine framework</CardTitle>
+          <a
+            href="/csat-nps/survey-optimizer"
+            className="shrink-0 text-[11.5px] font-semibold text-kpmg-violet hover:underline"
+          >
+            Running live in Survey Participation Optimizer &rarr;
+          </a>
+        </CardHeader>
+        <CardContent>
+          <SparFramework />
+
+          <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-kpmg-violet/20 bg-kpmg-violet/[0.04] p-3.5">
+            <Info
+              className="mt-0.5 size-4 shrink-0 text-kpmg-violet"
+              strokeWidth={2.1}
+            />
+            <p className="text-[12px] leading-relaxed text-slate-600">
+              {SPAR_NOTE}
+            </p>
           </div>
         </CardContent>
       </Card>
