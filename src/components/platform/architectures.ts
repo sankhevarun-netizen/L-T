@@ -1,7 +1,7 @@
 import { MessagesSquare, Network, type LucideIcon } from 'lucide-react'
 
 import { FeedbackIntelligenceSlide } from './feedback-intelligence-slide'
-import { PendingArchitecture } from './pending-architecture'
+import { CrmArchitecture } from './crm-architecture'
 
 /**
  * The reference architectures this build can show.
@@ -31,11 +31,10 @@ export const ARCHITECTURES: ArchitectureEntry[] = [
     name: 'KPMG DICE Architecture for CLM',
     shortName: 'KPMG DICE for CLM',
     blurb:
-      'How DICE sits across the customer lifecycle, end to end. The diagram for this tile has not been supplied yet.',
+      'The full CRM-centric stack for customer lifecycle management: interaction channels and data foundation feeding the CRM hub, the AI intelligence and orchestration layers above it, and the business outcomes they drive.',
     icon: Network,
-    facts: [],
-    pending: true,
-    Component: PendingArchitecture,
+    facts: ['6 layers', 'CRM hub', '8 outcomes'],
+    Component: CrmArchitecture,
   },
   {
     slug: 'feedback-intelligence',
