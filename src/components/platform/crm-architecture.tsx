@@ -233,6 +233,22 @@ const OUTCOMES = [
   'Leadership visibility & decision intelligence',
 ]
 
+/**
+ * Facts about the diagram, folded from the diagram's own data.
+ *
+ * The tile that links here shows layer and coverage counts. Typing those by
+ * hand would let the tile drift from the thing it describes the moment a mark
+ * is added or removed, so it reads them from LAYERS instead.
+ */
+export function summariseCrmArchitecture() {
+  const items = LAYERS.flatMap((l) => l.groups.flatMap((g) => g.items))
+  return {
+    layers: LAYERS.length,
+    built: items.filter((i) => i.built).length,
+    total: items.length,
+  }
+}
+
 function countBuilt(layer: Layer) {
   const items = layer.groups.flatMap((g) => g.items)
   return { built: items.filter((i) => i.built).length, total: items.length }
