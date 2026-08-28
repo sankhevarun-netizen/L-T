@@ -1,9 +1,13 @@
 import { SURVEY_QUESTIONS, THEME_DEFS, THEME_DEFS_BY_ID } from '@/data/feedback'
 import { DEMO_NOW, dayPartOf } from '@/data/reference'
 import { PERSONAS } from '@/data/personas'
+import { PROJECTS } from '@/data/reference'
+import { formatNumber } from '@/lib/format'
 import type {
+  Engagement,
   FeedbackTheme,
   Lead,
+  Payment,
   SurveyQuestion,
   Intervention,
   JourneyStage,
@@ -1136,4 +1140,73 @@ export function selectResponseKnowledge(
         .map(personaLabel),
     ),
   }
+}
+
+/**
+ * What the engine actually reads.
+ *
+ * The pitch names six data inputs; this counts them off the live book so the
+ * claim is auditable on screen rather than asserted on a slide. Every figure
+ * is derived from the same records the predictions run on — if an input were
+ * ever disconnected, its row here would go to zero rather than keep printing
+ * a number that sounds right.
+ */
+export function selectDataInputs(input: {
+  leads: Lead[]
+  engagements: Engagement[]
+  payments: Payment[]
+  invites: SurveyInvite[]
+  responses: SurveyResponse[]
+}) {
+  const { leads, engagements, payments, invites, responses } = input
+
+  const sent = invites.filter((i) => i.sentAt)
+  const responded = invites.filter((i) => i.status === 'responded')
+  const lapsed = invites.filter(
+    (i) => i.status === 'expired' || i.status === 'abandoned',
+  )
+  const overdue = payments.filter((p) => p.status === 'overdue')
+  const channels = new Set(invites.map((i) => i.channel))
+  const withHistory = new Set(engagements.map((e) => e.leadId))
+
+  return [
+    {
+      label: 'Customer and project profile',
+      value: formatNumber(leads.length),
+      detail: `${PROJECTS.length} projects · ${PERSONAS.length} personas mapped`,
+      usedFor: 'Who exists, and which persona and stage they sit in',
+    },
+    {
+      label: 'CSAT/NPS invitations and responses',
+      value: `${formatNumber(invites.length)} / ${formatNumber(responses.length)}`,
+      detail: `${formatNumber(sent.length)} actually sent`,
+      usedFor: 'The book every score, theme and trend is computed from',
+    },
+    {
+      label: 'Respondent and non-respondent history',
+      value: `${formatNumber(responded.length)} / ${formatNumber(lapsed.length)}`,
+      detail: 'Responded vs. expired or abandoned',
+      usedFor: 'Trains the response-likelihood prediction',
+    },
+    {
+      label: 'Survey date, time, and comm. channels',
+      value: formatNumber(engagements.length),
+      detail: `${channels.size} channels · ${formatNumber(withHistory.size)} customers with contact history`,
+      usedFor: 'Picks the preferred channel and the right moment',
+    },
+    {
+      label: 'Transaction milestones',
+      value: formatNumber(payments.length),
+      detail: `${formatNumber(overdue.length)} overdue`,
+      usedFor: 'Holds back a survey landing beside a demand letter',
+    },
+    {
+      label: 'Survey performance',
+      value: sent.length
+        ? `${Math.round((responded.length / sent.length) * 100)}%`
+        : '0%',
+      detail: `${formatNumber(responded.length)} of ${formatNumber(sent.length)} sent`,
+      usedFor: 'The baseline every outcome below is measured against',
+    },
+  ]
 }

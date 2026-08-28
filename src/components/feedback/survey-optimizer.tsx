@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Ban,
   CircleCheck,
   Clock,
   CornerDownRight,
+  Database,
   Send,
   TrendingUp,
 } from 'lucide-react'
@@ -16,7 +17,7 @@ import { StatTile } from '@/components/shared/stat-tile'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { HumanReviewNote, IllustrativeBadge } from './guardrails'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
-import { composeQuestions } from '@/lib/selectors/feedback'
+import { composeQuestions, selectDataInputs } from '@/lib/selectors/feedback'
 import { CONDITIONAL_FOLLOW_UPS } from '@/data/feedback'
 import { usePersonaFor } from '@/lib/personas/use-persona-map'
 import { formatNumber } from '@/lib/format'
@@ -61,6 +62,72 @@ const CHANNEL_LABEL: Record<SurveyInvite['channel'], string> = {
   sms: 'SMS',
   call: 'Call',
   'in-app': 'In-app',
+}
+
+/**
+ * The inputs the engine runs on.
+ *
+ * The pitch names six existing data sources; without them on screen a client
+ * has to take on trust that the predictions are reading anything real. Each
+ * row counts live records and says what that input decides, so the column is
+ * auditable rather than decorative — a disconnected input reads zero here
+ * instead of quietly printing a number that sounds plausible.
+ */
+function DataInputs() {
+  const leads = useCrmStore((s) => s.leads)
+  const engagements = useCrmStore((s) => s.engagements)
+  const payments = useCrmStore((s) => s.payments)
+  const surveyInvites = useCrmStore((s) => s.surveyInvites)
+  const surveyResponses = useCrmStore((s) => s.surveyResponses)
+
+  const rows = useMemo(
+    () =>
+      selectDataInputs({
+        leads,
+        engagements,
+        payments,
+        invites: surveyInvites,
+        responses: surveyResponses,
+      }),
+    [leads, engagements, payments, surveyInvites, surveyResponses],
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-1.5">
+          <Database className="size-4 text-kpmg-blue" />
+          Key data inputs
+        </CardTitle>
+        <span className="text-[10.5px] font-medium text-slate-400">
+          Existing records, counted live
+        </span>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((row) => (
+            <div
+              key={row.label}
+              className="min-w-0 border-l-2 border-slate-100 pl-2.5"
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="min-w-0 truncate text-[11.5px] font-semibold text-slate-700">
+                  {row.label}
+                </p>
+                <p className="nums shrink-0 text-[13px] font-bold text-slate-900">
+                  {row.value}
+                </p>
+              </div>
+              <p className="mt-0.5 text-[11px] text-slate-500">{row.detail}</p>
+              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                {row.usedFor}
+              </p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 /**
@@ -504,6 +571,8 @@ export function SurveyOptimizer() {
           accentBg="bg-amber-50"
         />
       </div>
+
+      <DataInputs />
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* The queue */}
