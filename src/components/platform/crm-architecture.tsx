@@ -40,10 +40,12 @@ import {
 } from 'lucide-react'
 
 /**
- * CRM-Centric AI Enablement Architecture — the KPMG "Our PoV" slide.
+ * DICE Architecture for Customer Lifecycle Management — the KPMG "Our PoV"
+ * slide.
  *
- * A faithful reproduction on a fixed 1600x900 stage scaled to its container,
- * so proportions and line breaks match the source rather than reflowing.
+ * A fixed 1600x900 stage scaled to its container, so proportions and line
+ * breaks match the source rather than reflowing. The heading is the product's
+ * own name by request; the six layers below it are verbatim from the source.
  *
  * Two departures from the supplied spec, both deliberate. The type is the
  * interface's Inter rather than the spec's Open Sans stand-in, and the icons
@@ -295,9 +297,9 @@ export function CrmArchitecture() {
         >
           <h1 className="text-[37px] font-extrabold leading-[1.06] tracking-[-0.022em]">
             <span style={{ color: 'var(--orange)' }}>
-              CRM-Centric AI Enablement Architecture
+              DICE Architecture
             </span>{' '}
-            for customer lifecycle management
+            for Customer Lifecycle Management
           </h1>
 
           <div

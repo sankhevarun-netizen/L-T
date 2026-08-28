@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 
 /**
- * Customer Feedback Intelligence — the KPMG "Our PoV" slide.
+ * SPAR AI Engine for Customer Intelligence — the KPMG "Our PoV" slide.
  *
- * A faithful reproduction: same layout, colours, wording and casing as the
- * source. Built on a fixed 1600x900 stage scaled to whatever width it is given,
- * so proportions and line breaks match the slide rather than reflowing to the
+ * The layout, colours and body content reproduce the source faithfully. The
+ * heading does not: it carries the product's own name rather than the deck's,
+ * by request. Everything below it is still verbatim, casing included.
+ *
+ * Built on a fixed 1600x900 stage scaled to whatever width it is given, so
+ * proportions and line breaks match the slide rather than reflowing to the
  * browser.
  *
  * One deliberate departure from the spec: the type is the interface's own Inter
@@ -140,8 +143,8 @@ export function FeedbackIntelligenceSlide() {
         >
           {/* ---- Title ---- */}
           <h1 className="text-[39px] font-extrabold leading-[1.06] tracking-[-0.015em]">
-            <span style={{ color: 'var(--orange)' }}>Customer Feedback</span>{' '}
-            Intelligence Strengthening Voice-of-Customer Insights
+            <span style={{ color: 'var(--orange)' }}>SPAR AI ENGINE</span>{' '}
+            for Customer Intelligence
           </h1>
           <p className="mt-[7px] text-[14.5px] italic" style={{ color: '#404F66' }}>
             Using existing customer and survey data to deliver timely, relevant and
