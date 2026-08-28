@@ -1,13 +1,16 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 
 import { DemoMenu } from './demo-menu'
 import { DemoNotice } from './demo-notice'
 import { Header } from './header'
 import { LastUpdated } from './last-updated'
+import { RestrictedScreen, useCanAccess } from './restriction'
 import { Sidebar } from './sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { resolveNavItem } from '@/config/nav'
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -24,7 +27,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <DemoMenu />
                 <LastUpdated />
               </div>
-              <div className="mt-2">{children}</div>
+              <div className="mt-2">
+                <Guarded>{children}</Guarded>
+              </div>
             </div>
           </main>
         </div>
@@ -33,4 +38,20 @@ export function AppShell({ children }: { children: ReactNode }) {
       <DemoNotice />
     </TooltipProvider>
   )
+}
+
+/**
+ * Renders the page, or the reason this seat cannot see it.
+ *
+ * Sits here rather than in each page so a route added later is covered by
+ * default, and so typing a URL directly is stopped the same way clicking a
+ * locked nav row is.
+ */
+function Guarded({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const allowed = useCanAccess(pathname)
+  if (allowed) return <>{children}</>
+
+  const { title } = resolveNavItem(pathname)
+  return <RestrictedScreen href={pathname} label={title} />
 }

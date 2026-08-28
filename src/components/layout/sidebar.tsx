@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ChevronsLeft } from 'lucide-react'
+import { ChevronsLeft, Lock } from 'lucide-react'
 
 import { KpmgLogo } from './kpmg-logo'
 import {
@@ -17,6 +18,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useUIStore } from '@/store/ui-store'
+import {
+  RestrictionDialog,
+  useCanAccess,
+  useRestrictionHint,
+} from './restriction'
 import { cn } from '@/lib/utils'
 
 function NavLink({
@@ -29,6 +35,51 @@ function NavLink({
   collapsed: boolean
 }) {
   const Icon = item.icon
+  const allowed = useCanAccess(item.href)
+  const hint = useRestrictionHint(item.href, item.label)
+  const [showRestriction, setShowRestriction] = useState(false)
+
+  /*
+   * Locked rows stay visible. Hiding them would teach a client nothing about
+   * the access model; a lock that explains itself demonstrates it.
+   */
+  if (!allowed) {
+    const locked = (
+      <button
+        type="button"
+        onClick={() => setShowRestriction(true)}
+        aria-label={hint}
+        className={cn(
+          'group relative flex w-full items-center gap-3 rounded-lg py-2 text-[13.5px] font-medium transition-colors',
+          collapsed ? 'justify-center px-0' : 'px-3',
+          'text-white/30 hover:bg-white/[0.05] hover:text-white/50',
+        )}
+      >
+        <Icon className="size-[18px] shrink-0" strokeWidth={1.9} />
+        {!collapsed && (
+          <>
+            <span className="truncate">{item.label}</span>
+            <Lock className="ml-auto size-3.5 shrink-0" strokeWidth={2.2} />
+          </>
+        )}
+      </button>
+    )
+
+    return (
+      <>
+        <Tooltip>
+          <TooltipTrigger asChild>{locked}</TooltipTrigger>
+          <TooltipContent side="right">{hint}</TooltipContent>
+        </Tooltip>
+        <RestrictionDialog
+          href={item.href}
+          label={item.label}
+          open={showRestriction}
+          onOpenChange={setShowRestriction}
+        />
+      </>
+    )
+  }
 
   const link = (
     <Link

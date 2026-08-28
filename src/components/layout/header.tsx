@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, ChevronDown, Layers3, Search } from 'lucide-react'
+import { useState } from 'react'
+import { Bell, Check, ChevronDown, Layers3, Lock, Search } from 'lucide-react'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -14,15 +15,33 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { CURRENT_USER } from '@/config/brand'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { ROLES } from '@/config/roles'
 import { resolveNavItem } from '@/config/nav'
 import { cn } from '@/lib/utils'
+import {
+  RestrictionDialog,
+  useActiveRole,
+  useCanAccess,
+  useRestrictionHint,
+} from './restriction'
 import { useUIStore } from '@/store/ui-store'
 
 export function Header() {
   const pathname = usePathname()
   const { title, subtitle } = resolveNavItem(pathname)
   const isStack = pathname === '/tech-stack'
+
+  const activeRole = useActiveRole()
+  const setActiveRole = useUIStore((s) => s.setActiveRole)
+
+  const canSeeStack = useCanAccess('/tech-stack')
+  const stackHint = useRestrictionHint('/tech-stack', 'Tech Stack')
+  const [stackBlocked, setStackBlocked] = useState(false)
 
   const searchQuery = useUIStore((s) => s.searchQuery)
   const setSearchQuery = useUIStore((s) => s.setSearchQuery)
@@ -56,20 +75,45 @@ export function Header() {
         screen a client asks for by name mid-demo, and hunting the sidebar for it
         is the wrong moment to be scrolling.
       */}
-      <Link
-        href="/tech-stack"
-        aria-current={isStack ? 'page' : undefined}
-        className={cn(
-          'flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kpmg-blue/30',
-          isStack
-            ? 'bg-kpmg-navy text-white'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
-        )}
-      >
-        <Layers3 className="size-4" strokeWidth={2.1} />
-        <span className="hidden sm:inline">Tech Stack</span>
-      </Link>
+      {canSeeStack ? (
+        <Link
+          href="/tech-stack"
+          aria-current={isStack ? 'page' : undefined}
+          className={cn(
+            'flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kpmg-blue/30',
+            isStack
+              ? 'bg-kpmg-navy text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
+          )}
+        >
+          <Layers3 className="size-4" strokeWidth={2.1} />
+          <span className="hidden sm:inline">Tech Stack</span>
+        </Link>
+      ) : (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setStackBlocked(true)}
+                aria-label={stackHint}
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-slate-50 px-3 text-[13px] font-semibold text-slate-400 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kpmg-blue/30"
+              >
+                <Lock className="size-4" strokeWidth={2.1} />
+                <span className="hidden sm:inline">Tech Stack</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{stackHint}</TooltipContent>
+          </Tooltip>
+          <RestrictionDialog
+            href="/tech-stack"
+            label="Tech Stack"
+            open={stackBlocked}
+            onOpenChange={setStackBlocked}
+          />
+        </>
+      )}
 
       {/* Notifications */}
       <button
@@ -93,24 +137,62 @@ export function Header() {
         <DropdownMenuTrigger className="flex shrink-0 items-center gap-3 rounded-xl px-1 py-1 outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-kpmg-blue/30">
           <Avatar className="size-10">
             <AvatarFallback className="bg-kpmg-navy text-[13px]">
-              {CURRENT_USER.initials}
+              {activeRole.initials}
             </AvatarFallback>
           </Avatar>
           <div className="hidden text-left leading-tight xl:block">
             <p className="text-[13.5px] font-semibold text-slate-900">
-              {CURRENT_USER.name}
+              {activeRole.name}
             </p>
-            <p className="text-xs text-slate-500">{CURRENT_USER.role}</p>
+            <p className="text-xs text-slate-500">{activeRole.role}</p>
           </div>
           <ChevronDown className="size-4 text-slate-400" />
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Signed in</DropdownMenuLabel>
-          <DropdownMenuItem>My profile</DropdownMenuItem>
-          <DropdownMenuItem>Team &amp; territories</DropdownMenuItem>
-          <DropdownMenuItem>Notification settings</DropdownMenuItem>
+        <DropdownMenuContent align="end" className="w-[300px]">
+          <DropdownMenuLabel>View the platform as</DropdownMenuLabel>
+          {ROLES.map((role) => {
+            const active = role.id === activeRole.id
+            return (
+              <DropdownMenuItem
+                key={role.id}
+                onClick={() => setActiveRole(role.id)}
+                className="items-start gap-2.5"
+              >
+                <Avatar className="mt-0.5 size-7">
+                  <AvatarFallback
+                    className={cn(
+                      'text-[11px]',
+                      active ? 'bg-kpmg-navy' : 'bg-slate-400',
+                    )}
+                  >
+                    {role.initials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-semibold text-slate-900">
+                      {role.role}
+                    </span>
+                    {active && (
+                      <Check
+                        className="size-3.5 shrink-0 text-kpmg-teal"
+                        strokeWidth={2.6}
+                      />
+                    )}
+                  </span>
+                  <span className="block truncate text-[11.5px] text-slate-500">
+                    {role.name}
+                  </span>
+                  <span className="block text-[11px] leading-snug text-slate-400">
+                    {role.scope}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            )
+          })}
           <DropdownMenuSeparator />
+          <DropdownMenuItem>Notification settings</DropdownMenuItem>
           <DropdownMenuItem>Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -2,7 +2,13 @@
 
 import { create } from 'zustand'
 
+import { DEFAULT_ROLE_ID, type RoleId } from '@/config/roles'
+
 interface UIState {
+  /** Which seat the app is being viewed as. */
+  activeRoleId: RoleId
+  setActiveRole: (roleId: RoleId) => void
+
   sidebarCollapsed: boolean
   toggleSidebar: () => void
   setSidebarCollapsed: (collapsed: boolean) => void
@@ -15,6 +21,9 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
+  activeRoleId: DEFAULT_ROLE_ID,
+  setActiveRole: (activeRoleId) => set({ activeRoleId }),
+
   sidebarCollapsed: false,
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
