@@ -79,6 +79,7 @@ function DataInputs() {
   const payments = useCrmStore((s) => s.payments)
   const surveyInvites = useCrmStore((s) => s.surveyInvites)
   const surveyResponses = useCrmStore((s) => s.surveyResponses)
+  const ingestedLeadIds = useCrmStore((s) => s.ingestedLeadIds)
 
   const rows = useMemo(
     () =>
@@ -88,8 +89,16 @@ function DataInputs() {
         payments,
         invites: surveyInvites,
         responses: surveyResponses,
+        ingestedLeadIds,
       }),
-    [leads, engagements, payments, surveyInvites, surveyResponses],
+    [
+      leads,
+      engagements,
+      payments,
+      surveyInvites,
+      surveyResponses,
+      ingestedLeadIds,
+    ],
   )
 
   return (
@@ -182,6 +191,16 @@ function EngagementEngine({ invite }: { invite: SurveyInvite }) {
   const lead = useCrmStore((s) => s.leadsById[invite.leadId])
   const assignment = usePersonaFor(invite.leadId)
 
+  /*
+   * Whether this customer's history has actually arrived through EAI.
+   *
+   * It is the honest caveat on every prediction below: DICE reasons over the
+   * ingested record, so a customer whose history has not been ingested is one
+   * the engine is guessing about from thinner evidence. Saying so beats
+   * presenting the same confidence for both.
+   */
+  const ingested = useCrmStore((s) => s.ingestedLeadIds.includes(invite.leadId))
+
   const questions = composeQuestions(
     lead,
     invite.touchpoint,
@@ -200,9 +219,23 @@ function EngagementEngine({ invite }: { invite: SurveyInvite }) {
 
   return (
     <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-kpmg-blue">
-        KPMG SPAR AI Engine
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-kpmg-blue">
+          KPMG SPAR AI Engine
+        </p>
+        <span
+          className={cn(
+            'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+            ingested
+              ? 'bg-kpmg-teal/10 text-kpmg-teal'
+              : 'bg-amber-50 text-amber-700',
+          )}
+        >
+          {ingested
+            ? 'History ingested'
+            : 'History not ingested — predicting on thinner evidence'}
+        </span>
+      </div>
 
       {/* Predict — the ring the four numbered decisions sit inside. */}
       <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2.5">

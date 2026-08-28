@@ -1157,8 +1157,10 @@ export function selectDataInputs(input: {
   payments: Payment[]
   invites: SurveyInvite[]
   responses: SurveyResponse[]
+  ingestedLeadIds: string[]
 }) {
   const { leads, engagements, payments, invites, responses } = input
+  const ingested = new Set(input.ingestedLeadIds)
 
   const sent = invites.filter((i) => i.sentAt)
   const responded = invites.filter((i) => i.status === 'responded')
@@ -1199,6 +1201,18 @@ export function selectDataInputs(input: {
       value: formatNumber(payments.length),
       detail: `${formatNumber(overdue.length)} overdue`,
       usedFor: 'Holds back a survey landing beside a demand letter',
+    },
+    {
+      label: 'Ingested interaction history',
+      // A count, not a share. At the seeded 9 of 12,842 a percentage rounds to
+      // 0% and reads as a broken feed rather than as a backlog waiting to be
+      // ingested.
+      value: formatNumber(ingested.size),
+      detail: `of ${formatNumber(leads.length)} records, arrived via EAI`,
+      // Scope stated exactly. Ingestion gates what the agents may act on; it
+      // does not filter the scores and themes on these screens, and implying
+      // otherwise would misrepresent every figure above.
+      usedFor: 'Gates what agents may act on — the figures above read the full book',
     },
     {
       label: 'Survey performance',
