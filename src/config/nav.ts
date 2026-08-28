@@ -11,6 +11,7 @@ import {
   Headset,
   Home,
   Layers,
+  Layers3,
   MapPin,
   MessagesSquare,
   ShieldAlert,
@@ -65,6 +66,14 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Data Ingestion',
         subtitle:
           'Pull a batch from a source system and watch EAI and sanitization run on it.',
+      },
+      {
+        label: 'Tech Stack',
+        href: '/tech-stack',
+        icon: Layers3,
+        title: 'Tech Stack',
+        subtitle:
+          'Every layer this build runs on — a request from the user down to the source records.',
       },
     ],
   },

@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bell, ChevronDown, Search } from 'lucide-react'
+import { Bell, ChevronDown, Layers3, Search } from 'lucide-react'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -15,11 +16,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { CURRENT_USER } from '@/config/brand'
 import { resolveNavItem } from '@/config/nav'
+import { cn } from '@/lib/utils'
 import { useUIStore } from '@/store/ui-store'
 
 export function Header() {
   const pathname = usePathname()
   const { title, subtitle } = resolveNavItem(pathname)
+  const isStack = pathname === '/tech-stack'
 
   const searchQuery = useUIStore((s) => s.searchQuery)
   const setSearchQuery = useUIStore((s) => s.setSearchQuery)
@@ -47,6 +50,26 @@ export function Header() {
           className="h-11 rounded-xl bg-slate-50 pl-9 text-[13.5px]"
         />
       </div>
+
+      {/*
+        Tech Stack. A named entry point rather than a nav row: it is the one
+        screen a client asks for by name mid-demo, and hunting the sidebar for it
+        is the wrong moment to be scrolling.
+      */}
+      <Link
+        href="/tech-stack"
+        aria-current={isStack ? 'page' : undefined}
+        className={cn(
+          'flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-[13px] font-semibold transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kpmg-blue/30',
+          isStack
+            ? 'bg-kpmg-navy text-white'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800',
+        )}
+      >
+        <Layers3 className="size-4" strokeWidth={2.1} />
+        <span className="hidden sm:inline">Tech Stack</span>
+      </Link>
 
       {/* Notifications */}
       <button
