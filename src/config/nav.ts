@@ -19,6 +19,7 @@ import {
   UsersRound,
   Wallet,
   DatabaseZap,
+  Waypoints,
   Workflow,
   type LucideIcon,
 } from 'lucide-react'
@@ -172,6 +173,14 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Persona Mapping',
         subtitle:
           'Every lead scored against six buyer personas — with the evidence behind each assignment.',
+      },
+      {
+        label: 'Agent Chain',
+        href: '/agent-chain',
+        icon: Waypoints,
+        title: 'Agent Chain',
+        subtitle:
+          'Agents handing conclusions to each other for one customer — and the proof that they did.',
       },
       {
         label: 'Campaign Analytics',

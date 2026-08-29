@@ -107,6 +107,7 @@ export const ROUTE_ACCESS: Record<string, RoleId[]> = {
   '/csat-nps': ['sales-manager', 'cx-head', 'managing-director'],
   '/persona-mapping': ['sales-manager', 'cx-head', 'managing-director'],
   '/campaign-analytics': ['sales-manager', 'managing-director'],
+  '/agent-chain': ['sales-manager', 'cx-head', 'managing-director'],
 
   /* Manager view */
   '/pipeline-dashboard': ['sales-manager', 'managing-director'],

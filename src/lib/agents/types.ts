@@ -107,6 +107,12 @@ export interface AgentContext {
    */
   feedbackThemes: FeedbackTheme[]
   feedbackClusters: RootCauseCluster[]
+  /**
+   * What agents earlier in the chain concluded. Empty for a solo run, which is
+   * why every agent keeps a fallback to reading raw records — nothing
+   * regresses when an agent is run on its own from the gallery.
+   */
+  priorFindings?: AgentFinding[]
   ai: AIService
 }
 
@@ -116,6 +122,19 @@ export interface AgentContext {
 
 export interface AgentFinding {
   id: string
+  /**
+   * Which agent concluded this. Stamped by defineAgent rather than by each
+   * agent, so it cannot be forgotten. Attribution used to live only on the run
+   * result, which meant a pooled view could not say who said what.
+   */
+  agentId?: string
+  /**
+   * Set when this conclusion rests on another agent's rather than on raw
+   * records. This is what makes a chain a chain instead of a list, and the UI
+   * resolves the citation through it at render time — so a handoff that did
+   * not happen has nothing to draw.
+   */
+  citesFindingId?: string
   leadId?: string
   subjectName: string
   headline: string

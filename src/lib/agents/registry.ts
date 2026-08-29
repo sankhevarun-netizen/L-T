@@ -78,10 +78,22 @@ export function defineAgent(
     narrate?: (findings: AgentFinding[], ctx: AgentContext) => string
   },
 ): Agent {
+  /*
+   * Stamp attribution here rather than in each agent. Seventeen agents would
+   * each have had to remember, and a finding without an agentId is invisible
+   * in a pooled view — the failure would be silent.
+   */
+  const stamp = (findings: AgentFinding[]) =>
+    findings.map((f) => (f.agentId ? f : { ...f, agentId: spec.id }))
+
   return {
     ...spec,
+    // Both paths stamp: the Overview widgets read detectSync directly.
+    detectSync(ctx) {
+      return stamp(spec.detectSync(ctx))
+    },
     async detect(ctx) {
-      const findings = spec.detectSync(ctx)
+      const findings = stamp(spec.detectSync(ctx))
       if (findings.length) {
         // One AI call per run, used to colour the headline finding.
         await ctx.ai.analyzeSentiment(
@@ -799,21 +811,38 @@ const nextBestActionAgent = defineAgent({
   detectSync(ctx) {
     const rows = nextBestActionQueue(ctx)
 
-    return rows.map((row) =>
-      finding({
+    return rows.map((row) => {
+      /*
+       * If an earlier agent already established what this customer wants or
+       * where the visit stalled, act on that conclusion rather than deriving
+       * the reason again from the score alone. Empty on a solo run, so the
+       * gallery behaviour is unchanged.
+       */
+      const prior = (ctx.priorFindings ?? []).filter(
+        (f) => f.leadId === row.leadId,
+      )
+      const source =
+        prior.find((f) => f.agentId === 'agent-customer360') ??
+        prior.find((f) => f.agentId === 'agent-visit') ??
+        prior.find((f) => f.agentId === 'agent-validation')
+
+      return finding({
         id: `nba-${row.leadId}`,
         leadId: row.leadId,
         subjectName: row.customerName,
         severity: row.score >= 80 ? 'high' : row.score >= 60 ? 'medium' : 'info',
+        citesFindingId: source?.id,
         headline: `${row.customerName} — ${row.action}`,
         detail: row.reason,
-        evidence: [
-          `Lead score ${row.score}/100`,
-          `${row.project} · ${row.budget}`,
-          `Owner ${row.owner}`,
-        ],
-      }),
-    )
+        evidence: source
+          ? [`Acting on: ${source.headline}`, `Lead score ${row.score}/100`, `Owner ${row.owner}`]
+          : [
+              `Lead score ${row.score}/100`,
+              `${row.project} · ${row.budget}`,
+              `Owner ${row.owner}`,
+            ],
+      })
+    })
   },
 
   async recommendAction(findings, ctx) {

@@ -325,25 +325,51 @@ const detractorRecoveryAgent = defineAgent({
         return a.npsScore - b.npsScore
       })
 
-    return unworked.slice(0, MAX_FINDINGS).map((response) =>
-      finding({
+    return unworked.slice(0, MAX_FINDINGS).map((response) => {
+      /*
+       * Prefer an earlier agent's conclusion over re-reading the raw record.
+       *
+       * Run alone this finds nothing and the agent falls back to citing the
+       * ticket id exactly as before, so the gallery is unchanged. Run in a
+       * chain it carries Service Resolution's and VoC Analyzer's actual
+       * conclusions forward instead of independently re-deriving them, which is
+       * the whole difference between agents sharing inputs and agents sharing
+       * conclusions.
+       */
+      const prior = (ctx.priorFindings ?? []).filter(
+        (f) => f.leadId === response.leadId,
+      )
+      const fromService = prior.find((f) => f.agentId === 'agent-service')
+      const fromVoc = prior.find((f) => f.agentId === 'agent-voc-analyzer')
+
+      const handedOver: string[] = []
+      if (fromService) handedOver.push(`Service Resolution: ${fromService.headline}`)
+      if (fromVoc) handedOver.push(`VoC Analyzer: ${fromVoc.headline}`)
+
+      return finding({
         id: `recovery-${response.id}`,
         leadId: response.leadId,
         subjectName: response.customerName,
         severity: severityForScore(response.npsScore),
+        citesFindingId: fromService?.id ?? fromVoc?.id,
         headline: `${response.customerName} scored ${response.npsScore}/10 with no recovery case open`,
         detail: response.sourceTicketId
           ? `An unresolved service ticket (${response.sourceTicketId}) was already open when this score was given.`
           : `Detractor on the ${TOUCHPOINT_LABEL[response.touchpoint].toLowerCase()} touchpoint with no owner assigned.`,
-        evidence: [
-          `Verbatim: "${response.verbatim.slice(0, 140)}${response.verbatim.length > 140 ? '…' : ''}"`,
-          `Channel ${response.channel} · ${TOUCHPOINT_LABEL[response.touchpoint]}`,
-          response.sourceTicketId
-            ? `Linked service ticket ${response.sourceTicketId} still unresolved`
-            : 'No linked service ticket',
-        ],
-      }),
-    )
+        evidence: handedOver.length
+          ? [
+              ...handedOver,
+              `Verbatim: "${response.verbatim.slice(0, 140)}${response.verbatim.length > 140 ? '…' : ''}"`,
+            ]
+          : [
+              `Verbatim: "${response.verbatim.slice(0, 140)}${response.verbatim.length > 140 ? '…' : ''}"`,
+              `Channel ${response.channel} · ${TOUCHPOINT_LABEL[response.touchpoint]}`,
+              response.sourceTicketId
+                ? `Linked service ticket ${response.sourceTicketId} still unresolved`
+                : 'No linked service ticket',
+            ],
+      })
+    })
   },
 
   async recommendAction(findings, ctx) {
