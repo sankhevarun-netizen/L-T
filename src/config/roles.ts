@@ -85,7 +85,11 @@ export const ROUTE_ACCESS: Record<string, RoleId[]> = {
   '/': ALL,
   '/platform': ['managing-director'],
   '/data-ingestion': ['managing-director'],
-  '/tech-stack': ['managing-director'],
+  // Open to every seat: it describes how the platform is built rather than
+  // customer data, and the user band on it names whichever seat is viewing.
+  // How it Works and Data Ingestion stay MD-only, so the restriction story
+  // is still demonstrable from the default seat.
+  '/tech-stack': ALL,
 
   /* Customer journey */
   '/leads': ALL,

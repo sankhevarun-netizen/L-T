@@ -1,3 +1,5 @@
+'use client'
+
 import {
   ArrowDown,
   BarChart3,
@@ -21,6 +23,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { useActiveRole } from '@/components/layout/restriction'
 import { cn } from '@/lib/utils'
 
 /**
@@ -256,6 +259,13 @@ const LOOP_STEPS = [
 ]
 
 export function TechStack() {
+  /*
+   * The request enters the stack at whoever is actually signed in, so the top
+   * card reads the live seat rather than a fixed role. It used to say "Sales
+   * Manager" while the header said Managing Director.
+   */
+  const activeRole = useActiveRole()
+
   return (
     <div className="animate-fade-in">
       {/* Head */}
@@ -302,14 +312,14 @@ export function TechStack() {
         </span>
       </div>
 
-      {/* User */}
+      {/* User — whichever seat is signed in, not a fixed one */}
       <Divider label="User" />
       <div className="mx-auto max-w-[430px]">
         <Card
           accent="navy"
           node={{
-            title: 'Sales Manager',
-            detail: 'Opens a screen, asks a copilot, approves a write',
+            title: activeRole.role,
+            detail: `${activeRole.name} · ${activeRole.scope}`,
             icon: Users,
           }}
         />
