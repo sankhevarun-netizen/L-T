@@ -16,7 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { CHAINS, NON_CHAINING_AGENT_IDS } from '@/lib/agents/chains'
 import { AGENTS_BY_ID } from '@/lib/agents/registry'
-import { candidatesForChain, runChain, type ChainRunResult } from '@/lib/agents/runtime'
+import {
+  candidatesForChain,
+  executeWrite,
+  runChain,
+  type ChainRunResult,
+} from '@/lib/agents/runtime'
 import { useAgentContext } from '@/lib/agents/use-agent-context'
 import { cn } from '@/lib/utils'
 
@@ -55,6 +60,8 @@ export function AgentChain() {
   const [chained, setChained] = useState(true)
   const [run, setRun] = useState<ChainRunResult | null>(null)
   const [busy, setBusy] = useState(false)
+  /** What actually landed in the CRM, in the facade's own words. */
+  const [committed, setCommitted] = useState<string[] | null>(null)
 
   const chain = CHAINS.find((c) => c.id === chainId)!
 
@@ -75,6 +82,9 @@ export function AgentChain() {
       return
     }
     setBusy(true)
+    // A new run invalidates the old commit record — leaving it up would let a
+    // brief for one customer appear to have been committed for another.
+    setCommitted(null)
     // A real mode, not a display filter: isolated actually withholds
     // priorFindings from every step, so the agents fall back to raw records and
     // the evidence genuinely differs.
@@ -90,6 +100,19 @@ export function AgentChain() {
 
   const active = candidates.find((c) => c.leadId === leadId)
   const concluded = run?.steps.filter((s) => s.status === 'concluded').length ?? 0
+
+  /*
+   * Commit the brief.
+   *
+   * The plans are already deduplicated, so this writes each distinct action
+   * once through the same facade a single-agent run uses — which is what puts
+   * every one of them in the CRM activity feed rather than inventing a second
+   * audit path for chained runs.
+   */
+  function handleCommit() {
+    if (!run?.plans.length) return
+    setCommitted(run.plans.map((p) => executeWrite(p.write)))
+  }
 
   return (
     <div className="animate-fade-in space-y-4">
@@ -365,13 +388,45 @@ export function AgentChain() {
                     </>
                   )}
 
+                  {committed && (
+                    <div className="mt-3 rounded-lg border border-kpmg-teal/25 bg-kpmg-teal/[0.05] px-3 py-2.5">
+                      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-kpmg-teal">
+                        <Check className="size-3" strokeWidth={3} />
+                        Written to the CRM
+                      </p>
+                      <ul className="mt-1.5 space-y-1">
+                        {committed.map((line, i) => (
+                          <li key={i} className="text-[11.5px] leading-snug text-slate-600">
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-1.5 text-[10.5px] text-slate-400">
+                        Each one is now in the CRM activity feed, attributed to DICE.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
                     <p className="text-[11px] text-slate-400">
-                      Nothing here is written. The chain proposes; a human commits.
+                      {committed
+                        ? 'Committed. Re-running the chain starts a fresh proposal.'
+                        : 'Nothing here is written yet. The chain proposes; you commit.'}
                     </p>
-                    <Button size="sm" variant="outline" disabled>
-                      Commit {run.plans.length} write
-                      {run.plans.length === 1 ? '' : 's'}
+                    <Button
+                      size="sm"
+                      variant={committed ? 'outline' : 'default'}
+                      disabled={!!committed || !run.plans.length}
+                      onClick={handleCommit}
+                    >
+                      {committed ? (
+                        'Committed'
+                      ) : (
+                        <>
+                          Commit {run.plans.length} write
+                          {run.plans.length === 1 ? '' : 's'}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
