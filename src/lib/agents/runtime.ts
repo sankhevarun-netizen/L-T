@@ -9,7 +9,13 @@ import type {
   CrmWrite,
 } from './types'
 import { AGENTS_BY_ID } from './registry'
-import { CHAINS_BY_ID, type ChainStepResult } from './chains'
+import {
+  CHAINS_BY_ID,
+  NON_CHAINING_AGENT_IDS,
+  type ChainStepResult,
+} from './chains'
+import { baselineConfidence, withCorroboration } from './confidence'
+import { detectConflicts, type AgentConflict } from './conflicts'
 
 /**
  * Runs an agent end to end: detect → recommend → (optionally) execute.
@@ -156,6 +162,30 @@ export interface ChainRunResult {
   plans: AgentActionPlan[]
   /** How many steps actually rested on an earlier agent's conclusion. */
   handoffs: number
+  /**
+   * The book-level agents' read on what the chain found.
+   *
+   * These five cannot be per-customer steps — their findings are about themes,
+   * campaigns and the pipeline, not about one person. But they can answer "is
+   * this customer's problem a pattern or a one-off?", which is exactly the
+   * context a human needs before committing. So they run last and are matched
+   * against what the chain concluded.
+   */
+  context: ContextResult[]
+  /** Where two agents want opposite things for this customer. */
+  conflicts: AgentConflict[]
+}
+
+export interface ContextResult {
+  agentId: string
+  agentName: string
+  status: 'concluded' | 'nothing-to-add'
+  headline?: string
+  detail?: string
+  evidence?: string[]
+  confidence?: number
+  /** The chain conclusion this context was matched against. */
+  matchedOn?: string
 }
 
 /**
@@ -253,7 +283,114 @@ export async function runChain(
     plans.push(...(await agent.recommendAction(found, stepCtx)))
   }
 
-  return { chainId, leadId, steps, plans: dedupePlans(plans), handoffs }
+  /*
+   * Corroboration is applied after the fact, not during.
+   *
+   * An agent cannot know while it runs whether a later one will agree, so
+   * weighting a conclusion by agreement has to happen once every step has had
+   * its say. Each finding is raised by how many *other* agents independently
+   * concluded something about the same customer.
+   */
+  const perAgent = new Set(pooled.map((f) => f.agentId))
+  for (const step of steps) {
+    step.findings = step.findings.map((f) =>
+      withCorroboration(
+        { ...f, confidence: f.confidence ?? baselineConfidence(f) },
+        Math.max(0, perAgent.size - 1),
+      ),
+    )
+  }
+
+  const deduped = dedupePlans(plans)
+
+  return {
+    chainId,
+    leadId,
+    steps,
+    plans: deduped,
+    handoffs,
+    context: bookLevelContext(scoped, pooled),
+    conflicts: detectConflicts(deduped),
+  }
+}
+
+/**
+ * What the book-level agents make of the chain's conclusions.
+ *
+ * Matching is on shared words between the chain's headlines and each aggregate
+ * agent's subject — the theme, campaign or touchpoint it reports on. Crude, but
+ * honest: it only fires on a genuine textual overlap, and an agent with no
+ * overlap says it has nothing to add rather than being shown attached to a
+ * customer it never mentioned.
+ */
+function bookLevelContext(
+  ctx: AgentContext,
+  chainFindings: AgentFinding[],
+): ContextResult[] {
+  // Words the chain actually used, minus filler that would match anything.
+  const STOP = new Set([
+    'the', 'and', 'for', 'with', 'this', 'that', 'from', 'has', 'was', 'not',
+    'open', 'days', 'day', 'scored', 'customer', 'lead', 'no', 'a', 'an', 'in',
+    'on', 'of', 'to', 'is', 'are', 'by', 'at', 'it', 'its',
+  ])
+  const chainWords = new Set(
+    chainFindings
+      .flatMap((f) => `${f.headline} ${f.detail}`.toLowerCase().split(/[^a-z]+/))
+      // Six characters and up. The first cut allowed four and matched
+      // "cross" from "Cross-project" against an unrelated chain — a context
+      // panel that fires on noise is worse than one that stays quiet.
+      .filter((w) => w.length >= 6 && !STOP.has(w)),
+  )
+
+  return NON_CHAINING_AGENT_IDS.map((agentId) => {
+    const agent = AGENTS_BY_ID[agentId]
+    if (!agent) {
+      return { agentId, agentName: agentId, status: 'nothing-to-add' as const }
+    }
+
+    let findings: AgentFinding[] = []
+    try {
+      // These read the whole book on purpose — that is what makes them context.
+      findings = agent.detectSync(ctx)
+    } catch {
+      findings = []
+    }
+
+    /*
+     * Match on the agent's own subject — the theme or campaign it reports on —
+     * not on its headline prose. The headline carries counts and verbs that
+     * collide with anything; the subject is what the finding is actually about.
+     */
+    const hit = findings.find((f) =>
+      f.subjectName
+        .toLowerCase()
+        .split(/[^a-z]+/)
+        .some((w) => w.length >= 6 && chainWords.has(w)),
+    )
+
+    if (!hit) {
+      return {
+        agentId,
+        agentName: agent.name,
+        status: 'nothing-to-add' as const,
+      }
+    }
+
+    const matched = [...chainWords].find((w) =>
+      hit.subjectName.toLowerCase().includes(w),
+    )
+
+    return {
+      agentId,
+      agentName: agent.name,
+      status: 'concluded' as const,
+      headline: hit.headline,
+      detail: hit.detail,
+      evidence: hit.evidence,
+      confidence: hit.confidence ?? baselineConfidence(hit),
+      matchedOn: matched,
+    }
+  })
 }
 
 /**
@@ -312,11 +449,20 @@ function scopeToLead(ctx: AgentContext, leadId: string): AgentContext {
  *
  * Cheap because detectSync is a pure rule pass with no AI call.
  */
-export function candidatesForChain(
+export interface ChainCandidate {
+  leadId: string
+  name: string
+  steps: number
+  handoffs: number
+  /** Two of this chain's agents want opposite things for this customer. */
+  contested?: boolean
+}
+
+export async function candidatesForChain(
   chainId: string,
   ctx: AgentContext,
   limit = 6,
-): { leadId: string; name: string; steps: number; handoffs: number }[] {
+): Promise<ChainCandidate[]> {
   const chain = CHAINS_BY_ID[chainId]
   if (!chain) return []
 
@@ -328,12 +474,30 @@ export function candidatesForChain(
     for (const f of agent.detectSync(ctx)) if (f.leadId) seen.add(f.leadId)
   }
 
-  const scored: {
-    leadId: string
-    name: string
-    steps: number
-    handoffs: number
-  }[] = []
+  /*
+   * Disagreement will not show up in that set.
+   *
+   * Agents rank the whole book and report their worst five, so two of them
+   * landing on the same customer globally is rare — the contested cases are
+   * customers neither agent ranks highly on its own but both have something to
+   * say about once you look at them directly. So for the contested chain the
+   * search widens to customers with a service ticket or a survey response,
+   * which is where an opt-out and a recovery case can genuinely collide.
+   */
+  if (chain.kind === 'Contested') {
+    const ticketed = new Set(ctx.serviceTickets.map((t) => t.leadId))
+    const answered = new Set(ctx.surveyResponses.map((r) => r.leadId))
+    let widened = 0
+    for (const lead of ctx.leads) {
+      if (widened >= CONTESTED_SCAN_LIMIT) break
+      if (ticketed.has(lead.id) || answered.has(lead.id)) {
+        seen.add(lead.id)
+        widened += 1
+      }
+    }
+  }
+
+  const scored: ChainCandidate[] = []
 
   for (const leadId of seen) {
     const scoped = scopeToLead(ctx, leadId)
@@ -362,18 +526,58 @@ export function candidatesForChain(
       pooled.push(...found)
     }
 
+    const contested =
+      chain.kind === 'Contested' && hits > 1
+        ? detectConflicts(await plansFor(chain, scoped)).length > 0
+        : false
+
     if (hits > 1) {
       scored.push({
         leadId,
         name: ctx.leads.find((l) => l.id === leadId)?.name ?? leadId,
         steps: hits,
         handoffs,
+        contested,
       })
     }
   }
 
-  // A visible handoff outranks a longer chain that never passes anything.
+  /*
+   * A contested customer outranks everything: it is the case the chain exists
+   * to show. After that a visible handoff beats a longer chain that never
+   * passes anything.
+   */
   return scored
-    .sort((a, b) => b.handoffs - a.handoffs || b.steps - a.steps)
+    .sort(
+      (a, b) =>
+        Number(b.contested ?? false) - Number(a.contested ?? false) ||
+        b.handoffs - a.handoffs ||
+        b.steps - a.steps,
+    )
     .slice(0, limit)
+}
+
+/** How many record-bearing customers the contested scan will look at. */
+const CONTESTED_SCAN_LIMIT = 260
+
+/**
+ * The plans this chain's agents would propose for one already-scoped customer.
+ *
+ * recommendAction is genuinely async, so this awaits it rather than reading a
+ * promise as if it were an array — that shortcut would have silently found no
+ * conflicts at all while looking like it worked.
+ */
+async function plansFor(
+  chain: { steps: { agentId: string }[] },
+  scoped: AgentContext,
+): Promise<AgentActionPlan[]> {
+  const out: AgentActionPlan[] = []
+  for (const step of chain.steps) {
+    const agent = AGENTS_BY_ID[step.agentId]
+    if (!agent) continue
+    const found = agent.detectSync(scoped)
+    if (!found.length) continue
+    out.push(...(await agent.recommendAction(found, scoped)))
+  }
+  return out
 }

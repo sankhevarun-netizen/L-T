@@ -21,12 +21,33 @@ export interface ChainStep {
 export interface ChainDef {
   id: string
   name: string
-  kind: 'Reactive' | 'Diagnostic' | 'Proactive'
+  kind: 'Reactive' | 'Diagnostic' | 'Proactive' | 'Contested'
   premise: string
   steps: ChainStep[]
 }
 
 export const CHAINS: ChainDef[] = [
+  {
+    /*
+     * The one where they disagree.
+     *
+     * Sentiment reads an opt-out and wants the customer left alone; Recovery
+     * and Payment read a detractor score and an unresolved bill and want owned
+     * effort put in. Both are defensible from the record, and they cannot both
+     * be acted on — which is exactly the case a human has to settle.
+     */
+    id: 'contested',
+    name: 'Contested customer',
+    kind: 'Contested',
+    premise:
+      'Two agents read the same customer and want opposite things. Somebody has to decide.',
+    steps: [
+      { agentId: 'agent-sentiment', role: 'Observe' },
+      { agentId: 'agent-service', role: 'Observe' },
+      { agentId: 'agent-payment', role: 'Act' },
+      { agentId: 'agent-detractor-recovery', role: 'Act' },
+    ],
+  },
   {
     id: 'buying-picture',
     name: 'What this customer actually wants',

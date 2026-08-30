@@ -9,6 +9,7 @@ import {
   Link2,
   Loader2,
   ShieldCheck,
+  TriangleAlert,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -20,8 +21,10 @@ import {
   candidatesForChain,
   executeWrite,
   runChain,
+  type ChainCandidate,
   type ChainRunResult,
 } from '@/lib/agents/runtime'
+import { confidenceBand } from '@/lib/agents/confidence'
 import { useAgentContext } from '@/lib/agents/use-agent-context'
 import { cn } from '@/lib/utils'
 
@@ -65,15 +68,27 @@ export function AgentChain() {
 
   const chain = CHAINS.find((c) => c.id === chainId)!
 
-  /* Customers this chain genuinely fires on, ranked by visible handoffs. */
-  const candidates = useMemo(
-    () => candidatesForChain(chainId, ctx),
-    [chainId, ctx],
-  )
+  /*
+   * Customers this chain genuinely fires on.
+   *
+   * Async because scoring a contested customer means asking each agent what it
+   * would actually propose, and recommendAction is asynchronous. Ranked so a
+   * customer two agents disagree about comes first — that is the case the
+   * contested chain exists to show.
+   */
+  const [candidates, setCandidates] = useState<ChainCandidate[]>([])
 
   useEffect(() => {
-    setLeadId(candidates[0]?.leadId ?? null)
-  }, [candidates])
+    let cancelled = false
+    candidatesForChain(chainId, ctx).then((c) => {
+      if (cancelled) return
+      setCandidates(c)
+      setLeadId(c[0]?.leadId ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [chainId, ctx])
 
   useEffect(() => {
     let cancelled = false
@@ -178,8 +193,15 @@ export function AgentChain() {
                     >
                       <InitialsAvatar name={c.name} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12.5px] font-semibold text-slate-900">
-                          {c.name}
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate text-[12.5px] font-semibold text-slate-900">
+                            {c.name}
+                          </span>
+                          {c.contested && (
+                            <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700">
+                              Contested
+                            </span>
+                          )}
                         </span>
                         <span className="block text-[11px] text-slate-500">
                           {c.steps} of {chain.steps.length} steps
@@ -297,6 +319,40 @@ export function AgentChain() {
                               <p className="mt-1.5 text-[12.5px] font-medium leading-snug text-slate-800">
                                 {finding.headline}
                               </p>
+
+                              {/*
+                                A weighting, not a probability — and labelled as
+                                one. It moves with how much evidence the agent
+                                cited, how serious it judged the finding, and
+                                whether other agents independently concluded
+                                something about the same customer.
+                              */}
+                              {typeof finding.confidence === 'number' && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400">
+                                    Weight
+                                  </span>
+                                  <span className="h-1.5 w-[86px] shrink-0 overflow-hidden rounded-full bg-slate-100">
+                                    <span
+                                      className={cn(
+                                        'block h-full rounded-full',
+                                        confidenceBand(finding.confidence) === 'strong'
+                                          ? 'bg-kpmg-teal'
+                                          : confidenceBand(finding.confidence) === 'moderate'
+                                            ? 'bg-kpmg-blue'
+                                            : 'bg-slate-300',
+                                      )}
+                                      style={{ width: `${finding.confidence}%` }}
+                                    />
+                                  </span>
+                                  <span className="nums text-[11px] font-semibold text-slate-600">
+                                    {finding.confidence}
+                                  </span>
+                                  <span className="text-[10.5px] capitalize text-slate-400">
+                                    {confidenceBand(finding.confidence)}
+                                  </span>
+                                </div>
+                              )}
                               <ul className="mt-1.5 space-y-0.5">
                                 {finding.evidence.slice(0, 3).map((e, j) => (
                                   <li
@@ -337,6 +393,96 @@ export function AgentChain() {
                     )
                   })}
                 </ol>
+
+                {/*
+                  Where two agents want opposite things.
+                  Both cases are shown in full — the point is that a human
+                  decides, so hiding either side would defeat it.
+                */}
+                {run.conflicts.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                    <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                      <TriangleAlert className="size-3.5" strokeWidth={2.4} />
+                      {run.conflicts.length} agent disagreement
+                      {run.conflicts.length === 1 ? '' : 's'}
+                    </p>
+                    {run.conflicts.map((c, i) => (
+                      <div key={i} className="mt-2.5">
+                        <p className="text-[12.5px] font-semibold text-slate-800">
+                          {c.summary}
+                        </p>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {[c.a, c.b].map((plan) => (
+                            <div
+                              key={plan.id}
+                              className="rounded-lg border border-slate-200 bg-white p-2.5"
+                            >
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                {AGENTS_BY_ID[plan.agentId]?.name.replace(' Agent', '')}
+                              </p>
+                              <p className="mt-1 text-[12px] font-semibold text-slate-800">
+                                {plan.label}
+                              </p>
+                              <p className="mt-0.5 text-[11px] leading-snug text-slate-500">
+                                {plan.reason}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          Both read the same record and both are defensible. The
+                          platform does not pick — it surfaces the choice.
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/*
+                  The five agents that cannot be per-customer steps.
+                  They report on themes, campaigns and the pipeline, so they
+                  answer a different question: is this a pattern or a one-off?
+                */}
+                {run.context.some((c) => c.status === 'concluded') && (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-kpmg-violet">
+                      Book-level context
+                    </p>
+                    <p className="mt-1 text-[11.5px] text-slate-500">
+                      Agents that report on the whole book rather than one
+                      customer, matched against what this chain concluded.
+                    </p>
+                    <div className="mt-2.5 space-y-2">
+                      {run.context
+                        .filter((c) => c.status === 'concluded')
+                        .map((c) => (
+                          <div
+                            key={c.agentId}
+                            className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5"
+                          >
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="text-[12px] font-bold text-slate-800">
+                                {c.agentName.replace(' Agent', '')}
+                              </p>
+                              {c.matchedOn && (
+                                <span className="shrink-0 text-[10px] text-slate-400">
+                                  matched on &ldquo;{c.matchedOn}&rdquo;
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-[12px] leading-snug text-slate-600">
+                              {c.headline}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                    <p className="mt-2.5 text-[11px] text-slate-400">
+                      {run.context.filter((c) => c.status === 'nothing-to-add').length}{' '}
+                      of {run.context.length} book-level agents had nothing matching
+                      this customer.
+                    </p>
+                  </div>
+                )}
 
                 {/* Consolidated brief */}
                 <div className="mt-4 rounded-xl border border-kpmg-navy/20 bg-kpmg-navy/[0.03] p-4">

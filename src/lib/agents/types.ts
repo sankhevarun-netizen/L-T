@@ -140,6 +140,16 @@ export interface AgentFinding {
   headline: string
   detail: string
   severity: Severity
+  /**
+   * How much weight to put on this conclusion, 0-100.
+   *
+   * Derived, and deliberately never 100: it reflects how much evidence supports
+   * the finding, how serious the agent judged it, and whether another agent
+   * independently reached a compatible conclusion about the same customer. It
+   * is not a model probability, and the UI says so — presenting a heuristic as
+   * a calibrated likelihood would be the dishonest version of this.
+   */
+  confidence?: number
   /** The specific records/behaviour that justified the finding. */
   evidence: string[]
   impactCr?: number
