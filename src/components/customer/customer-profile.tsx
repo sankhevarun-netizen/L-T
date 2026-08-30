@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
+import { AgentBriefPanel } from './agent-brief-panel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { ScorePill } from '@/components/shared/score-pill'
@@ -571,6 +572,15 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
 
         {/* AI Insights */}
         <TabsContent value="insights">
+          {/*
+            What the agents concluded, at the top of the tab that exists for
+            exactly that. The full trace stays on /agent-chain; this links
+            through rather than duplicating it.
+          */}
+          <div className="mb-4">
+            <AgentBriefPanel leadId={leadId} />
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="p-5">
               <div className="mb-2 flex items-center gap-1.5">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   CircleCheck,
@@ -10,6 +10,7 @@ import {
   Info,
   ShieldCheck,
   TriangleAlert,
+  Upload
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,43 @@ export function IngestionConsole() {
   const [sourceId, setSourceId] = useState<IngestionSourceId>('salesforce')
   const [preview, setPreview] = useState<PipelineRun | null>(null)
   const [committed, setCommitted] = useState<number | null>(null)
+
+  /*
+   * The upload control.
+   *
+   * The file is genuinely read — name, size, row count and column headers all
+   * come from what the user picked, so the panel responds to their data rather
+   * than playing a canned animation. Nothing is merged: no lead is created and
+   * the store is never touched. The result panel says so in as many words,
+   * because a control this convincing has to be unambiguous about what it did
+   * not do.
+   */
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [upload, setUpload] = useState<{
+    name: string
+    sizeKb: number
+    rows: number
+    columns: string[]
+  } | null>(null)
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = String(reader.result ?? '')
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
+      const header = lines[0]?.split(',').map((h) => h.trim().replace(/^"|"$/g, '')) ?? []
+      setUpload({
+        name: file.name,
+        sizeKb: Math.max(1, Math.round(file.size / 1024)),
+        // First line is the header, so the body is what would be ingested.
+        rows: Math.max(0, lines.length - 1),
+        columns: header.slice(0, 8),
+      })
+    }
+    reader.readAsText(file)
+  }
 
   const sources = useMemo(
     () => selectIngestionSources({ leads, engagements, ingestedLeadIds }),
@@ -160,7 +198,72 @@ export function IngestionConsole() {
           </CardContent>
         </Card>
 
-        {/* Pipeline */}
+        {/* Bring your own file — visible, and honest about being a demonstration */}
+      <Card className="lg:col-start-1">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-1.5">
+            <Upload className="size-4 text-kpmg-blue" />
+            Import a file
+          </CardTitle>
+          <span className="text-[10.5px] font-medium text-slate-400">
+            CSV · demonstration
+          </span>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleFile}
+            className="hidden"
+          />
+          <Button variant="outline" onClick={() => fileRef.current?.click()}>
+            <Upload />
+            Choose a CSV file
+          </Button>
+
+          {upload && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                Validated &mdash; not merged
+              </p>
+              <p className="nums mt-1.5 text-[12.5px] font-semibold text-slate-800">
+                {upload.name}
+              </p>
+              <p className="nums mt-0.5 text-[11.5px] text-slate-500">
+                {formatNumber(upload.rows)} row(s) · {formatNumber(upload.sizeKb)} KB ·{' '}
+                {upload.columns.length} column(s) detected
+              </p>
+              {upload.columns.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {upload.columns.map((c) => (
+                    <span
+                      key={c}
+                      className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-medium text-slate-600 ring-1 ring-slate-200"
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2.5 text-[11.5px] leading-relaxed text-slate-600">
+                This is a demonstration environment. The file was read to show
+                what an import would carry — nothing has been written, no lead
+                was created, and the figures on every other screen are unchanged.
+              </p>
+            </div>
+          )}
+
+          {!upload && (
+            <p className="mt-2.5 text-[11.5px] leading-relaxed text-slate-500">
+              Shows what a customer file would bring in. Records are read and
+              reported, never merged into the demonstration book.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pipeline */}
         <Card className="flex min-w-0 flex-col">
           <CardHeader>
             <CardTitle>EAI &rarr; sanitization &rarr; CRM</CardTitle>
