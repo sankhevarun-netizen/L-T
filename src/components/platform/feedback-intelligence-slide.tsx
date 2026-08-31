@@ -70,12 +70,20 @@ const PATHWAY = [
   { label: 'Scale', token: 'var(--s5)', lines: ['Refine and expand', 'what works'] },
 ]
 
-/** The source keeps 1 and 2 above 4 and 3 — a cycle, not a list. */
+/*
+ * The four principles are numbered by the acronym they spell, not by reading
+ * order: S-mart follow-up, P-referred channel, A-t the right moment,
+ * R-elevant questions. The source had A and R transposed, which left the
+ * engine's own name unaccounted for on the slide that names it.
+ *
+ * `dark` alternates by position, not by item, so the colour checkerboard
+ * survives any renumbering.
+ */
 const PRINCIPLES = [
   { n: '1', lines: ['Smart', 'Follow-up'], dark: true },
   { n: '2', lines: ['Preferred', 'Channel'], dark: false },
-  { n: '4', lines: ['At the Right', 'moment'], dark: true },
-  { n: '3', lines: ['Relevant', 'questions'], dark: false },
+  { n: '3', lines: ['At the Right', 'moment'], dark: true },
+  { n: '4', lines: ['Relevant', 'questions'], dark: false },
 ]
 
 const STAGE_W = 1600

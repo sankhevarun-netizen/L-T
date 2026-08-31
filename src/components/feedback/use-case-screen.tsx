@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { ArrowLeft, Sparkles } from 'lucide-react'
 
 import { ComingSoon } from '@/components/layout/coming-soon'
-import { IllustrativeBanner } from './guardrails'
 import { ControlTower } from './control-tower'
 import { DetractorRecovery } from './detractor-recovery'
 import { FeedbackJourney } from './feedback-journey'
@@ -118,13 +117,6 @@ export function UseCaseScreen({ slug }: { slug: string }) {
           </Link>
         )}
       </div>
-
-      {/*
-        Type 1 gets no illustrative banner: it reports what was collected rather
-        than predicting anything, and stamping it with the same AI caveat would
-        blur the distinction the screen exists to draw.
-      */}
-      {!isTypeOne && <IllustrativeBanner />}
 
       <Screen slug={slug} />
     </div>

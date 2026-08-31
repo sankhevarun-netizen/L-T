@@ -32,19 +32,6 @@ export function IllustrativeBadge({ className }: { className?: string }) {
   )
 }
 
-/** Page-level banner. One per screen, above the content. */
-export function IllustrativeBanner({ note }: { note?: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-2.5">
-      <Info className="mt-px size-4 shrink-0 text-amber-600" strokeWidth={2.1} />
-      <p className="text-[11.5px] leading-relaxed text-amber-800">
-        {note ??
-          'Scores, propensities and correlations on this page are illustrative and require validation with client data. Correlations are diagnostic signals, not proven causality.'}
-      </p>
-    </div>
-  )
-}
-
 /**
  * Confidence in an AI-derived claim.
  *
