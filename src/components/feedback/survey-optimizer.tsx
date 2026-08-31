@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
-import { HumanReviewNote, IllustrativeBadge } from './guardrails'
+import { HumanReviewNote } from './guardrails'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
 import { composeQuestions, selectDataInputs } from '@/lib/selectors/feedback'
 import { CONDITIONAL_FOLLOW_UPS } from '@/data/feedback'
@@ -461,7 +461,6 @@ function OutcomePanels({
       <Card>
         <CardHeader>
           <CardTitle>Broader representation</CardTitle>
-          <IllustrativeBadge />
         </CardHeader>
         <CardContent className="pb-4">
           <div className="flex gap-6">
@@ -612,7 +611,6 @@ export function SurveyOptimizer() {
         <Card className="flex min-w-0 flex-col">
           <CardHeader>
             <CardTitle>Survey opportunity queue</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
             {sent.length > 0 && (
@@ -716,7 +714,6 @@ export function SurveyOptimizer() {
       <Card>
         <CardHeader>
           <CardTitle>Response likelihood by touchpoint</CardTitle>
-          <IllustrativeBadge />
         </CardHeader>
         <CardContent className="pb-4">
           <div className="overflow-x-auto scrollbar-slim">

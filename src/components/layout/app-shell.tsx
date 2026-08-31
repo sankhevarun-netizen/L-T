@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 
 import { DemoMenu } from './demo-menu'
-import { DemoNotice } from './demo-notice'
 import { Header } from './header'
 import { LastUpdated } from './last-updated'
 import { RestrictedScreen, useCanAccess } from './restriction'
@@ -35,7 +34,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <DemoNotice />
     </TooltipProvider>
   )
 }

@@ -6,7 +6,7 @@ import { CornerDownRight, MessageCircle, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { StagePill } from '@/components/shared/pills'
-import { HumanReviewNote, IllustrativeBadge, LockedQuestionBadge } from './guardrails'
+import { HumanReviewNote, LockedQuestionBadge } from './guardrails'
 import { CONDITIONAL_FOLLOW_UPS } from '@/data/feedback'
 import { composeQuestions } from '@/lib/selectors/feedback'
 import { PERSONAS_BY_ID } from '@/data/personas'
@@ -179,13 +179,10 @@ export function FeedbackJourney() {
             {/* Persona preview */}
             {persona && assignment && (
               <div className="mt-4 rounded-lg bg-slate-50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    <Users className="size-3" />
-                    Persona
-                  </p>
-                  <IllustrativeBadge />
-                </div>
+                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  <Users className="size-3" />
+                  Persona
+                </p>
                 <p className="mt-1 text-[12.5px] font-bold text-slate-900">
                   {persona.name}
                 </p>
@@ -322,7 +319,6 @@ export function FeedbackJourney() {
         <Card>
           <CardHeader>
             <CardTitle>Conditional follow-up path</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="pb-4">
             <ul className="space-y-2">

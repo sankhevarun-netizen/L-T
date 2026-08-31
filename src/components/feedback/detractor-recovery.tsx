@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { SeverityPill } from '@/components/shared/pills'
-import { HumanReviewNote, IllustrativeBadge } from './guardrails'
+import { HumanReviewNote } from './guardrails'
 import { caseSlaDaysOverdue } from '@/lib/selectors/feedback'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
 import { THEME_DEFS_BY_ID } from '@/data/feedback'
@@ -145,7 +145,6 @@ export function DetractorRecovery() {
         <Card className="flex min-w-0 flex-col">
           <CardHeader>
             <CardTitle>Detractor queue</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
             <ul className="max-h-[460px] overflow-y-auto scrollbar-slim">

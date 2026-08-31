@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { cn } from '@/lib/utils'
+
 /**
  * SPAR AI Engine for Customer Intelligence — the KPMG "Our PoV" slide.
  *
@@ -76,15 +78,23 @@ const PATHWAY = [
  * R-elevant questions. The source had A and R transposed, which left the
  * engine's own name unaccounted for on the slide that names it.
  *
- * `dark` alternates by position, not by item, so the colour checkerboard
- * survives any renumbering.
+ * The array stays in acronym order because that is what it means. Where each
+ * one sits is a separate question, answered at the placement below — they run
+ * clockwise, so 3 is under 2 and 4 is left of 3.
+ *
+ * `dark` is not on the items for the same reason: it alternates by corner, so
+ * carrying it in the data would break the checkerboard the moment two items
+ * swap places. It is passed at each placement instead, which makes the
+ * positional rule true by construction rather than by comment.
  */
 const PRINCIPLES = [
-  { n: '1', lines: ['Smart', 'Follow-up'], dark: true },
-  { n: '2', lines: ['Preferred', 'Channel'], dark: false },
-  { n: '3', lines: ['At the Right', 'moment'], dark: true },
-  { n: '4', lines: ['Relevant', 'questions'], dark: false },
+  { n: '1', lines: ['Smart', 'Follow-up'] },
+  { n: '2', lines: ['Preferred', 'Channel'] },
+  { n: '3', lines: ['At the Right', 'moment'] },
+  { n: '4', lines: ['Relevant', 'questions'] },
 ]
+
+const BY_N = Object.fromEntries(PRINCIPLES.map((p) => [p.n, p]))
 
 const STAGE_W = 1600
 const STAGE_H = 900
@@ -239,33 +249,33 @@ export function FeedbackIntelligenceSlide() {
                   >
                     KPMG SPAR AI Engine
                   </p>
+                  {/*
+                    A cycle, so it is drawn as one: 1 and 2 across the top, 3
+                    under 2, 4 left of 3, and the four connectors closing the
+                    loop clockwise. Auto-flow cannot express that once arrows
+                    occupy cells, so the nine children are written out in
+                    row-major order and land in the tracks by position.
+                  */}
                   <div
-                    className="grid w-[62%] rounded-[5px] border px-[20px] py-[12px]"
+                    className="grid w-[76%] rounded-[5px] border px-[18px] py-[11px]"
                     style={{
                       background: 'var(--spar)',
                       borderColor: 'var(--sparline)',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '11px 26px',
+                      gridTemplateColumns: '1fr auto 1fr',
+                      gap: '4px 14px',
                     }}
                   >
-                    {PRINCIPLES.map((p) => (
-                      <div key={p.n} className="flex items-center gap-[9px]">
-                        <b
-                          className="min-w-[19px] text-[25px] font-bold leading-none"
-                          style={{ color: 'var(--blue)' }}
-                        >
-                          {p.n}
-                        </b>
-                        <span
-                          className="text-[13.5px] font-bold leading-[1.2]"
-                          style={{ color: p.dark ? 'var(--navy)' : 'var(--blue)' }}
-                        >
-                          {p.lines[0]}
-                          <br />
-                          {p.lines[1]}
-                        </span>
-                      </div>
-                    ))}
+                    <Principle p={BY_N['1']} dark />
+                    <Cyc>&#10230;</Cyc>
+                    <Principle p={BY_N['2']} />
+
+                    <Cyc align="start">&#9650;</Cyc>
+                    <span />
+                    <Cyc align="end">&#9660;</Cyc>
+
+                    <Principle p={BY_N['4']} dark />
+                    <Cyc>&#10229;</Cyc>
+                    <Principle p={BY_N['3']} />
                   </div>
                 </div>
 
@@ -423,6 +433,65 @@ function Quad({
       <span className="mt-[3px] text-[13px] leading-[1.3]" style={{ color: '#2A3B57' }}>
         {children}
       </span>
+    </div>
+  )
+}
+
+/** One principle: its number, then its two-line label. */
+function Principle({
+  p,
+  dark,
+}: {
+  p: { n: string; lines: string[] }
+  dark?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-[9px]">
+      <b
+        className="min-w-[19px] text-[25px] font-bold leading-none"
+        style={{ color: 'var(--blue)' }}
+      >
+        {p.n}
+      </b>
+      <span
+        className="text-[13.5px] font-bold leading-[1.2]"
+        style={{ color: dark ? 'var(--navy)' : 'var(--blue)' }}
+      >
+        {p.lines[0]}
+        <br />
+        {p.lines[1]}
+      </span>
+    </div>
+  )
+}
+
+/*
+ * A connector inside the SPAR cycle.
+ *
+ * The verticals hug the edges rather than centring, so each sits against the
+ * column it belongs to instead of drifting into the middle of the box.
+ */
+function Cyc({
+  children,
+  align = 'center',
+}: {
+  children: React.ReactNode
+  align?: 'start' | 'center' | 'end'
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center text-[13px]',
+        align === 'start'
+          ? 'justify-start'
+          : align === 'end'
+            ? 'justify-end'
+            : 'justify-center',
+      )}
+      style={{ color: '#54627A' }}
+      aria-hidden
+    >
+      {children}
     </div>
   )
 }

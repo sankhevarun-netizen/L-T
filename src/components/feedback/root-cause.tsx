@@ -8,8 +8,7 @@ import { StatTile } from '@/components/shared/stat-tile'
 import {
   CorrelationNote,
   EvidenceList,
-  IllustrativeBadge,
-} from './guardrails'
+  } from './guardrails'
 import { Button } from '@/components/ui/button'
 import { useAIService } from '@/lib/ai/use-ai-service'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
@@ -107,7 +106,6 @@ export function RootCause() {
       <Card>
         <CardHeader>
           <CardTitle>Journey heatmap — NPS by stage and touchpoint</CardTitle>
-          <IllustrativeBadge />
         </CardHeader>
         <CardContent className="pb-4">
           <div className="overflow-x-auto scrollbar-slim">
@@ -191,7 +189,6 @@ export function RootCause() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Satisfaction by buyer persona</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
             <ul>
@@ -232,7 +229,6 @@ export function RootCause() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>Satisfaction by project</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
             <ul>
@@ -407,7 +403,6 @@ export function RootCause() {
           <Card className="flex min-w-0 flex-col">
             <CardHeader>
               <CardTitle className="min-w-0 truncate">{selected.label}</CardTitle>
-              <IllustrativeBadge />
             </CardHeader>
             <CardContent className="space-y-3 pb-4">
               <div className="grid grid-cols-3 gap-2">

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
 import { SentimentPill } from '@/components/shared/pills'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
-import { ConfidencePill, EvidenceList, IllustrativeBadge } from './guardrails'
+import { ConfidencePill, EvidenceList } from './guardrails'
 import { selectThemesForResponse } from '@/lib/selectors/feedback'
 import { Button } from '@/components/ui/button'
 import { useAIService } from '@/lib/ai/use-ai-service'
@@ -171,7 +171,7 @@ export function VocAnalyzer() {
         <StatTile
           label="Mean confidence"
           value={`${meanConfidence}%`}
-          sub="Illustrative until validated"
+          sub="Across extracted themes"
           icon={Sparkles}
           accent="text-kpmg-teal"
           accentBg="bg-kpmg-teal/10"
@@ -183,7 +183,6 @@ export function VocAnalyzer() {
         <Card className="flex min-w-0 flex-col">
           <CardHeader>
             <CardTitle>Theme hierarchy</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
             <div className="border-b border-slate-100 px-4 py-2.5">

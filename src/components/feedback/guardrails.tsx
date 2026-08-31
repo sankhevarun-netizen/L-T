@@ -1,4 +1,4 @@
-import { Info, Lock, Quote, ShieldCheck } from 'lucide-react'
+import { Lock, Quote, ShieldCheck } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -10,27 +10,6 @@ import { cn } from '@/lib/utils'
  * every screen. Retrofitting six screens at the end is how a guardrail quietly
  * ends up on five of them.
  */
-
-/**
- * Marks a number as illustrative.
- *
- * Goes on every score, probability, propensity and correlation. If a figure
- * would change once real client data arrives, it carries this.
- */
-export function IllustrativeBadge({ className }: { className?: string }) {
-  return (
-    <span
-      title="Illustrative — requires validation with client data"
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-amber-700',
-        className,
-      )}
-    >
-      <Info className="size-2.5" strokeWidth={2.4} />
-      Illustrative
-    </span>
-  )
-}
 
 /**
  * Confidence in an AI-derived claim.
@@ -55,7 +34,7 @@ export function ConfidencePill({
 
   return (
     <span
-      title={`${value}% confidence in this classification — illustrative`}
+      title={`${value}% confidence in this classification`}
       className={cn(
         'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
         tone,

@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { Sparkles } from 'lucide-react'
 
-import { IllustrativeBadge } from './guardrails'
 import {
   BEAT_META,
   FEEDBACK_TYPE_META,
@@ -135,14 +134,18 @@ function TypeTwoCard({
           {useCase.problem}
         </p>
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        {/*
+          The div stays even when there is no agent name: its mt-auto is what
+          pins this row to the bottom of the card. justify-between goes with the
+          badge — with one child left it would have shifted the agent name.
+        */}
+        <div className="mt-auto flex items-center gap-2 pt-1">
           {useCase.agentName && (
             <span className="flex items-center gap-1 text-[9.5px] font-bold uppercase tracking-wider text-kpmg-violet">
               <Sparkles className="size-3" strokeWidth={2.3} />
               {useCase.agentName}
             </span>
           )}
-          <IllustrativeBadge />
         </div>
       </div>
     </Link>

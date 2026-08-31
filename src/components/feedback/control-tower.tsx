@@ -4,7 +4,6 @@ import { ArrowDownRight, ArrowUpRight, Gauge, ListChecks, ShieldAlert } from 'lu
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
-import { IllustrativeBadge } from './guardrails'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
 import { formatNumber } from '@/lib/format'
 import type { Intervention } from '@/types'
@@ -152,7 +151,6 @@ export function ControlTower() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>What is lifting satisfaction</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
             {drivers.strengths.length ? (
@@ -178,7 +176,6 @@ export function ControlTower() {
         <Card className="flex flex-col">
           <CardHeader>
             <CardTitle>What is dragging it down</CardTitle>
-            <IllustrativeBadge />
           </CardHeader>
           <CardContent className="p-0">
             <ul>

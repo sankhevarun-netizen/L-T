@@ -200,7 +200,7 @@ const vocAnalyzerAgent = defineAgent({
         headline: theme.emerging
           ? `New theme appearing: ${theme.label} (${theme.mentions} mentions)`
           : `${theme.label} — ${theme.mentions} mentions, ${theme.sentiment}`,
-        detail: `Aspect ${theme.aspect}. Confidence ${theme.confidence}%, illustrative until validated against client data.`,
+        detail: `Aspect ${theme.aspect}. Confidence ${theme.confidence}%.`,
         evidence: theme.evidence,
       }),
     )
