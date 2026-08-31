@@ -22,16 +22,6 @@ import { useEffect, useRef, useState } from 'react'
  * They describe this one slide and would be noise in a design system.
  */
 
-const CHALLENGES = [
-  'Low CSAT/NPS Participation',
-  'Generic and Low-Depth Feedback',
-  'Generic Survey Timing and Outreach',
-  // Spec calls this spelling out explicitly. Do not normalise to "Underutilised".
-  'Underutilized Existing Customer Data',
-  'Weak feedback-to-action closure',
-  'Unclear Drivers Behind Ratings',
-]
-
 const DATA_INPUTS = [
   'Customer and project profile',
   'CSAT/NPS invitations and responses',
@@ -155,39 +145,10 @@ export function FeedbackIntelligenceSlide() {
           <div
             className="mt-[18px] grid min-h-0 flex-1"
             style={{
-              gridTemplateColumns: '212px 40px 226px 40px 604px 40px 326px',
+              gridTemplateColumns: '352px 40px 604px 40px 452px',
               gridTemplateRows: '1fr auto',
             }}
           >
-            {/* C1 — challenges */}
-            <section className="flex min-h-0 flex-col px-[6px]">
-              <ColumnHead>
-                Current Feedback
-                <br />
-                Challenges
-              </ColumnHead>
-              <div
-                className="mt-[14px] flex min-h-0 flex-1 flex-col gap-[9px] rounded-[4px] border p-[11px_10px]"
-                style={{ borderColor: 'var(--hair)' }}
-              >
-                {CHALLENGES.map((text) => (
-                  <div
-                    key={text}
-                    className="flex flex-1 items-center justify-center rounded-[4px] border px-[8px] py-[6px] text-center text-[13.5px] font-semibold leading-[1.25]"
-                    style={{
-                      background: 'var(--tile)',
-                      borderColor: 'var(--line)',
-                      color: 'var(--navy)',
-                    }}
-                  >
-                    {text}
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <Connector />
-
             {/* C2 — existing data */}
             <section className="flex min-h-0 flex-col px-[6px]">
               <ColumnHead>
@@ -366,13 +327,13 @@ export function FeedbackIntelligenceSlide() {
             {/* Row 2 — the two italic captions */}
             <p
               className="pt-[12px] text-center text-[14px] italic"
-              style={{ gridColumn: '1 / 5', color: '#33415C' }}
+              style={{ gridColumn: '1 / 3', color: '#33415C' }}
             >
               Data-Driven Transition
             </p>
             <p
               className="pt-[12px] text-center text-[14px] italic"
-              style={{ gridColumn: '5 / 8', color: '#33415C' }}
+              style={{ gridColumn: '3 / 6', color: '#33415C' }}
             >
               Outcome-Driven Transition
             </p>

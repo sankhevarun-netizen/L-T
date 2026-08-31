@@ -1,7 +1,8 @@
-import { MessagesSquare, Network, type LucideIcon } from 'lucide-react'
+import { MessagesSquare, Network, Share2, type LucideIcon } from 'lucide-react'
 
 import { FeedbackIntelligenceSlide } from './feedback-intelligence-slide'
 import { CrmArchitecture } from './crm-architecture'
+import { AgentCollaborationSlide } from './agent-collaboration-slide'
 
 /**
  * The reference architectures this build can show.
@@ -42,10 +43,20 @@ export const ARCHITECTURES: ArchitectureEntry[] = [
     // The bar sits two-across; the full name would wrap.
     shortName: 'KPMG SPAR AI Engine',
     blurb:
-      'Strengthening Voice-of-Customer insights: current challenges and existing data feeding the KPMG SPAR AI Engine, and the participation outcomes it is meant to produce.',
+      'Strengthening Voice-of-Customer insights: the existing customer and survey data feeding the KPMG SPAR AI Engine, and the participation outcomes it is meant to produce.',
     icon: MessagesSquare,
-    facts: ['4-stage flow', 'SPAR engine', '5-step pathway'],
+    facts: ['3-stage flow', 'SPAR engine', '5-step pathway'],
     Component: FeedbackIntelligenceSlide,
+  },
+  {
+    slug: 'agent-collaboration',
+    name: 'DICE Agent Collaboration Fabric',
+    shortName: 'Agent Collaboration',
+    blurb:
+      'How the seventeen agents hand conclusions to one another: the four chains and the agents in each, where a step stops and passes its finding forward, how a completed step is marked, and where the run statistics surface.',
+    icon: Share2,
+    facts: ['17 agents', '4 chains', '3 roles'],
+    Component: AgentCollaborationSlide,
   },
 ]
 
