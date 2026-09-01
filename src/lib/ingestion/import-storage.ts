@@ -24,6 +24,14 @@ export interface ImportPayload {
   version: 1
   batchIds: string[]
   savedAt: string
+  /*
+   * How the import was applied.
+   *
+   * This has to survive the reload. The seeded book is regenerated on every
+   * load, so restoring a replace as a merge would quietly hand back the very
+   * records the user replaced — the platform would show both books at once.
+   */
+  mode: 'merge' | 'replace'
   records: Partial<Record<RecordType, unknown[]>>
 }
 
@@ -137,6 +145,7 @@ function validate(value: unknown): ImportPayload | null {
     version: 1,
     batchIds: p.batchIds.filter((b): b is string => typeof b === 'string'),
     savedAt: typeof p.savedAt === 'string' ? p.savedAt : '',
+    mode: p.mode === 'replace' ? 'replace' : 'merge',
     records,
   }
 }

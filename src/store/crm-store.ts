@@ -65,7 +65,7 @@ const IMPORTABLE_TYPES: RecordType[] = [
  * on every load and storing it too would waste the quota on data that is
  * already free.
  */
-function persistImports(state: CrmState) {
+function persistImports(state: CrmState, mode: 'merge' | 'replace') {
   const records: Partial<Record<RecordType, unknown[]>> = {}
   for (const type of IMPORTABLE_TYPES) {
     const rows = state[type as keyof CrmState] as { importedBatchId?: string }[]
@@ -77,6 +77,7 @@ function persistImports(state: CrmState) {
     version: 1,
     batchIds: state.importedBatchIds,
     savedAt: new Date().toISOString(),
+    mode,
     records,
   }
   return writeImports(payload)
@@ -135,7 +136,7 @@ export interface CrmState {
   /** Merge parsed CSV records into the book, upserting on id. */
   importRecords: (
     records: Partial<Record<RecordType, { id: string }[]>>,
-    meta: { batchId: string; label: string },
+    meta: { batchId: string; label: string; mode?: 'merge' | 'replace' },
   ) => void
   /** Drop everything a CSV import brought in, in memory and on disk. */
   clearImportedData: () => void
@@ -482,7 +483,21 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     set((state) => {
       const next = { ...state } as Record<string, unknown>
       const stamped = { importedBatchId: meta.batchId }
+      const replace = meta.mode === 'replace'
       let written = 0
+
+      /*
+       * Replace empties every importable collection first, including the ones
+       * this upload does not carry.
+       *
+       * Leaving them would strand rows pointing at leads that no longer exist —
+       * a booking for a customer who is not in the book reads as a bug, not as
+       * a partial import. Switching books has to switch all of it.
+       */
+      if (replace) {
+        for (const type of IMPORTABLE_TYPES) next[type] = []
+        next.activities = []
+      }
 
       for (const type of mergeOrder(Object.keys(records) as RecordType[])) {
         const incoming = records[type]
@@ -491,7 +506,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         // Map preserves insertion order, so existing records keep their
         // position and genuinely new ones land at the end.
         const merged = new Map<string, unknown>()
-        for (const row of (state[type as keyof CrmState] as { id: string }[]) ?? []) {
+        for (const row of (next[type] as { id: string }[]) ?? []) {
           merged.set(row.id, row)
         }
         for (const row of incoming) {
@@ -503,8 +518,8 @@ export const useCrmStore = create<CrmState>((set, get) => ({
 
       // leadsById and the ingested set are derived views of `leads` and would
       // otherwise point at the records the upsert just replaced.
-      if (records.leads?.length) {
-        const leads = next.leads as Lead[]
+      if (records.leads?.length || replace) {
+        const leads = (next.leads ?? []) as Lead[]
         const byId: Record<string, Lead> = {}
         for (const lead of leads) byId[lead.id] = lead
         next.leadsById = byId
@@ -512,22 +527,24 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       }
 
       activitySeq += 1
-      next.importedBatchIds = [...state.importedBatchIds, meta.batchId]
+      next.importedBatchIds = replace
+        ? [meta.batchId]
+        : [...state.importedBatchIds, meta.batchId]
       next.activities = [
         {
           id: nextId('ACT', activitySeq),
           object: 'Lead' as const,
           recordId: meta.batchId,
           recordName: meta.label,
-          action: 'CSV import committed',
-          detail: `${written} record(s) merged from ${meta.label}`,
+          action: replace ? 'CSV import — book replaced' : 'CSV import committed',
+          detail: `${written} record(s) ${replace ? 'replaced the book' : 'merged'} from ${meta.label}`,
           source: 'EAI Ingestion' as const,
           at: DEMO_NOW.toISOString(),
         },
-        ...state.activities,
+        ...((next.activities ?? []) as SfActivity[]),
       ]
 
-      void persistImports(next as unknown as CrmState)
+      void persistImports(next as unknown as CrmState, replace ? 'replace' : 'merge')
       return next as unknown as CrmState
     }),
 
@@ -559,6 +576,8 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     get().importRecords(records, {
       batchId: payload.batchIds[0] ?? 'restored',
       label: 'restored from this browser',
+      // Restoring a replace as a merge would hand back the replaced book.
+      mode: payload.mode,
     })
   },
 

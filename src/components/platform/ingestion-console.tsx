@@ -108,6 +108,13 @@ export function IngestionConsole() {
    */
   const fileRef = useRef<HTMLInputElement>(null)
   const [imp, setImp] = useState<ImportPhase>({ step: 'idle' })
+  /*
+   * Merge adds to the book; replace swaps it.
+   *
+   * Off by default — replace throws away everything currently loaded, and that
+   * is not a thing to do because a checkbox happened to be remembered.
+   */
+  const [replaceBook, setReplaceBook] = useState(false)
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = [...(e.target.files ?? [])]
@@ -244,7 +251,11 @@ export function IngestionConsole() {
     }
 
     const label = imp.files.map((f) => f.name).join(', ').slice(0, 80)
-    importRecords(records, { batchId: `imp-${Date.now()}`, label })
+    importRecords(records, {
+      batchId: `imp-${Date.now()}`,
+      label,
+      mode: replaceBook ? 'replace' : 'merge',
+    })
     setImp({ step: 'done', plan, label })
   }
 
@@ -388,7 +399,7 @@ export function IngestionConsole() {
                 <Button onClick={handleImportCommit} disabled={!readyTypes.length}>
                   <ShieldCheck />
                   {readyTypes.length
-                    ? `Merge ${formatNumber(readyRows)} record(s)`
+                    ? `${replaceBook ? 'Replace book with' : 'Merge'} ${formatNumber(readyRows)} record(s)`
                     : 'No recognised files'}
                 </Button>
               )}
@@ -412,6 +423,25 @@ export function IngestionConsole() {
             )}
 
             {imp.step === 'review' && (
+              <>
+              <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                <input
+                  type="checkbox"
+                  checked={replaceBook}
+                  onChange={(e) => setReplaceBook(e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 accent-kpmg-blue"
+                />
+                <span className="text-[11.5px] leading-snug text-slate-600">
+                  <b className="font-semibold text-slate-800">
+                    Replace the current book
+                  </b>{' '}
+                  — clear everything loaded now and show only these files, so the
+                  platform reads as a different client entirely. Leave unticked to
+                  add these records alongside what is already here. Either way,
+                  Clear or Reset restores the original book.
+                </span>
+              </label>
+
               <div className="mt-3 space-y-1.5">
                 {imp.files.map((f) => (
                   <div
@@ -447,6 +477,7 @@ export function IngestionConsole() {
                   </div>
                 ))}
               </div>
+              </>
             )}
 
             {imp.step === 'done' && (
