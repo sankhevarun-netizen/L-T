@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { HERO_LEAD_ID } from '@/lib/selectors/use-overview-data'
+import { useHeroLead } from '@/lib/selectors/use-overview-data'
 import { formatNumber } from '@/lib/format'
 import { useCrmStore } from '@/store/crm-store'
 import { useSettingsStore } from '@/store/settings-store'
@@ -36,6 +36,8 @@ import { cn } from '@/lib/utils'
  */
 export function DemoMenu() {
   const router = useRouter()
+  // The snapshot's own choice, so the menu never offers a lead the book lost.
+  const hero = useHeroLead()
   const resetDemoData = useCrmStore((s) => s.resetDemoData)
   const activityCount = useCrmStore((s) => s.activities.length)
 
@@ -143,12 +145,14 @@ export function DemoMenu() {
             <Play />
             Play the hot-lead transcript
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => router.push(`/customers/${HERO_LEAD_ID}`)}
-          >
-            <UserRound />
-            Jump to Priya Shah&apos;s 360
-          </DropdownMenuItem>
+          {hero ? (
+            <DropdownMenuItem
+              onClick={() => router.push(`/customers/${hero.lead.id}`)}
+            >
+              <UserRound />
+              Jump to {hero.lead.name}&apos;s 360
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onClick={() => router.push('/ai-insights')}>
             <Zap />
             Open the agent gallery
