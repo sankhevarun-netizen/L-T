@@ -35,10 +35,22 @@ const PER_EVIDENCE = 6
 export const CORROBORATION_BONUS = 6
 const MAX_CORROBORATION = 15
 
+/**
+ * Charged against a finding the record only implies.
+ *
+ * An inferred case is real but weaker than a stated one, and scoring them
+ * identically would flatten exactly the distinction the signal exists to draw.
+ */
+const INFERRED_PENALTY = 12
+
 export function baselineConfidence(f: AgentFinding): number {
   const fromEvidence = Math.min(MAX_EVIDENCE, f.evidence.length * PER_EVIDENCE)
   const fromSeverity = SEVERITY_WEIGHT[f.severity] ?? 0
-  return Math.min(CEILING, BASE + fromEvidence + fromSeverity)
+  const inferred = f.signal === 'inferred' ? INFERRED_PENALTY : 0
+  return Math.max(
+    BASE - INFERRED_PENALTY,
+    Math.min(CEILING, BASE + fromEvidence + fromSeverity - inferred),
+  )
 }
 
 /** Raised when another agent independently concluded something about this customer. */

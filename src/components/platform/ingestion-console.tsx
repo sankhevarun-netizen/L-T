@@ -34,6 +34,8 @@ import {
 } from '@/lib/ingestion/schemas'
 import { salesforceCrm } from '@/lib/crm/salesforce-crm'
 import { useCrmStore } from '@/store/crm-store'
+import { AGENTS } from '@/lib/agents/registry'
+import { useAgentContext } from '@/lib/agents/use-agent-context'
 import { cn } from '@/lib/utils'
 
 /**
@@ -258,6 +260,29 @@ export function IngestionConsole() {
     })
     setImp({ step: 'done', plan, label })
   }
+
+  /*
+   * Which agents will have something to say about the book as it now stands.
+   *
+   * An agent going quiet after an import usually is not a bug — a book with no
+   * overdue payments should leave the payment agent silent — but a screen that
+   * simply shows nothing reads as broken. So the count is stated, and anything
+   * silent says what it was looking for.
+   *
+   * detectSync is a pure rule pass, so seventeen of them are safe to run
+   * inline. The context is built once and shared: several agents walk every
+   * verbatim, and rebuilding per agent would rescan the book seventeen times.
+   */
+  const agentCtx = useAgentContext()
+  const readiness = useMemo(() => {
+    if (imp.step !== 'done') return null
+    return AGENTS.map((agent) => ({
+      id: agent.id,
+      name: agent.name.replace(' Agent', ''),
+      count: agent.detectSync(agentCtx).length,
+      looksFor: agent.aiSolution,
+    }))
+  }, [imp.step, agentCtx])
 
   const sources = useMemo(
     () => selectIngestionSources({ leads, engagements, ingestedLeadIds }),
@@ -503,6 +528,43 @@ export function IngestionConsole() {
                   those rows rather than adding a second copy. Imported data is
                   held in this browser and is removed by Clear or by Reset.
                 </p>
+              </div>
+            )}
+
+            {imp.step === 'done' && readiness && (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-kpmg-violet">
+                  Agent readiness ·{' '}
+                  {readiness.filter((r) => r.count > 0).length} of {readiness.length}{' '}
+                  will produce findings
+                </p>
+                {readiness.some((r) => r.count === 0) ? (
+                  <>
+                    <p className="mt-1.5 text-[11.5px] leading-snug text-slate-500">
+                      These found nothing in this book. That is often correct — an
+                      agent with nothing to report should stay quiet — but here is
+                      what each was looking for.
+                    </p>
+                    <div className="mt-2 space-y-1.5">
+                      {readiness
+                        .filter((r) => r.count === 0)
+                        .map((r) => (
+                          <div key={r.id}>
+                            <p className="text-[11.5px] font-semibold text-slate-800">
+                              {r.name}
+                            </p>
+                            <p className="text-[11px] leading-snug text-slate-500">
+                              {r.looksFor}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-1.5 text-[11.5px] leading-snug text-slate-500">
+                    Every agent found something to report in this book.
+                  </p>
+                )}
               </div>
             )}
 

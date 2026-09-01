@@ -31,6 +31,26 @@ import type { Lead, Severity } from '@/types'
 const MAX_FINDINGS = 5
 
 /**
+ * One finding per lead, keeping the stronger signal.
+ *
+ * A lead can match both the text rule and the structural one. Two findings for
+ * the same person is double-counting, and showing the inferred one where the
+ * customer actually said it would understate what is known.
+ */
+function dedupeBySignal<T extends { lead: Lead; signal: 'stated' | 'inferred' }>(
+  rows: T[],
+): T[] {
+  const byLead = new Map<string, T>()
+  for (const row of rows) {
+    const held = byLead.get(row.lead.id)
+    if (!held || (held.signal === 'inferred' && row.signal === 'stated')) {
+      byLead.set(row.lead.id, row)
+    }
+  }
+  return [...byLead.values()]
+}
+
+/**
  * The two production queues the Command Center renders.
  *
  * These are the exact rule passes the Next Best Action and Risk Dashboard
@@ -202,34 +222,66 @@ const followUpAgent = defineAgent({
       ctx.tasks.filter((t) => t.status === 'Open').map((t) => t.whatId),
     )
 
+    /*
+     * Two ways to be a follow-up case.
+     *
+     * The customer saying "call me back" is the strong signal, but it only
+     * exists if somebody typed it. A real CRM export is often terse and the
+     * situation is still there: a call was answered, weeks passed, nothing was
+     * scheduled. That is inferred rather than stated, and marked so it cannot
+     * pass for the customer's own words.
+     */
     const deferred = ctx.leads
-      .filter((lead) => {
-        if (!isOpen(lead) || lead.dnd) return false
+      .filter((lead) => isOpen(lead) && !lead.dnd && !openTaskLeadIds.has(lead.id))
+      .map((lead) => {
         const said = ctx.engagements.some(
           (e) =>
             e.leadId === lead.id &&
             (DEFER_PATTERN.test(e.summary) || DEFER_PATTERN.test(e.subject)),
         )
-        return said && !openTaskLeadIds.has(lead.id)
+        if (said) return { lead, signal: 'stated' as const }
+        const days = lead.evidence.daysSinceLastActivity
+        // Narrow on purpose: answered at least once, and silent long enough to
+        // be neglect rather than a live conversation.
+        return lead.evidence.callsAnswered > 0 && days >= 14 && days <= 60
+          ? { lead, signal: 'inferred' as const }
+          : null
       })
-      .sort((a, b) => weightedValueCr(b) - weightedValueCr(a))
+      .filter((r): r is { lead: Lead; signal: 'stated' | 'inferred' } => r !== null)
+      .sort((a, b) => weightedValueCr(b.lead) - weightedValueCr(a.lead))
 
-    return deferred.slice(0, MAX_FINDINGS).map((lead) =>
-      finding({
-        id: `followup-${lead.id}`,
-        leadId: lead.id,
-        subjectName: lead.name,
-        severity: 'high',
-        headline: `${lead.name} asked for a callback — no task was ever created`,
-        detail: `${lead.evidence.daysSinceLastActivity} days since the commitment was made, with nothing scheduled against the record.`,
-        evidence: [
-          'Deferral captured in the call summary',
-          'No open follow-up task on the record',
-          `Lead score ${lead.score}, budget ₹${lead.budgetCr} Cr`,
-        ],
-        impactCr: weightedValueCr(lead),
-      }),
-    )
+    return dedupeBySignal(deferred)
+      .slice(0, MAX_FINDINGS)
+      .map(({ lead, signal }) =>
+        finding({
+          id: `followup-${lead.id}`,
+          leadId: lead.id,
+          subjectName: lead.name,
+          severity: signal === 'stated' ? 'high' : 'medium',
+          signal,
+          headline:
+            signal === 'stated'
+              ? `${lead.name} asked for a callback — no task was ever created`
+              : `${lead.name} answered a call ${lead.evidence.daysSinceLastActivity} days ago — nothing scheduled since`,
+          detail:
+            signal === 'stated'
+              ? `${lead.evidence.daysSinceLastActivity} days since the commitment was made, with nothing scheduled against the record.`
+              : `${lead.evidence.callsAnswered} of ${lead.evidence.callsAttempted} calls were answered, and no follow-up task exists on the record.`,
+          evidence:
+            signal === 'stated'
+              ? [
+                  'Deferral captured in the call summary',
+                  'No open follow-up task on the record',
+                  `Lead score ${lead.score}, budget ₹${lead.budgetCr} Cr`,
+                ]
+              : [
+                  `${lead.evidence.callsAnswered} answered call(s) on the record`,
+                  'No open follow-up task on the record',
+                  'Inferred from the record — the customer did not ask for a callback',
+                ],
+          impactCr: weightedValueCr(lead),
+        }),
+      )
   },
 
   async recommendAction(findings, ctx) {
@@ -334,30 +386,60 @@ const paymentAgent = defineAgent({
   crmAction: 'Create a finance callback Task and log the query against the Lead.',
 
   detectSync(ctx) {
+    /*
+     * A stated payment question, or a proposal nobody chased.
+     *
+     * Reaching proposal means commercials were discussed whether or not the
+     * summary records the question; no open task means nothing came of it.
+     */
+    const openTasks = new Set(
+      ctx.tasks.filter((t) => t.status === 'Open').map((t) => t.whatId),
+    )
     const askers = ctx.leads
-      .filter((lead) => {
-        if (!isOpen(lead) || lead.dnd) return false
-        return ctx.engagements.some(
+      .filter((lead) => isOpen(lead) && !lead.dnd)
+      .map((lead) => {
+        const asked = ctx.engagements.some(
           (e) =>
             e.leadId === lead.id &&
             (PAYMENT_PATTERN.test(e.summary) || PAYMENT_PATTERN.test(e.subject)),
         )
+        if (asked) return { lead, signal: 'stated' as const }
+        return lead.stage === 'proposal' && !openTasks.has(lead.id)
+          ? { lead, signal: 'inferred' as const }
+          : null
       })
-      .sort((a, b) => weightedValueCr(b) - weightedValueCr(a))
+      .filter((r): r is { lead: Lead; signal: 'stated' | 'inferred' } => r !== null)
+      .sort((a, b) => weightedValueCr(b.lead) - weightedValueCr(a.lead))
 
-    return askers.slice(0, MAX_FINDINGS).map((lead) =>
+    return dedupeBySignal(askers)
+      .slice(0, MAX_FINDINGS)
+      .map(({ lead, signal }) =>
       finding({
         id: `payment-${lead.id}`,
         leadId: lead.id,
         subjectName: lead.name,
-        severity: 'high',
-        headline: `${lead.name} asked about payment terms — no finance callback logged`,
-        detail: `Commercial intent raised ${lead.evidence.daysSinceLastActivity} days ago on a ₹${lead.budgetCr} Cr opportunity.`,
-        evidence: [
-          'Payment/loan question captured in the conversation record',
-          `Stage: ${lead.stage} · Score ${lead.score}`,
-          'No finance callback task on the record',
-        ],
+        severity: signal === 'stated' ? 'high' : 'medium',
+        signal,
+        headline:
+          signal === 'stated'
+            ? `${lead.name} asked about payment terms — no finance callback logged`
+            : `${lead.name} is at proposal with no finance follow-up scheduled`,
+        detail:
+          signal === 'stated'
+            ? `Commercial intent raised ${lead.evidence.daysSinceLastActivity} days ago on a ₹${lead.budgetCr} Cr opportunity.`
+            : `A proposal has been sent on a ₹${lead.budgetCr} Cr opportunity and no finance task exists against it.`,
+        evidence:
+          signal === 'stated'
+            ? [
+                'Payment/loan question captured in the conversation record',
+                `Stage: ${lead.stage} · Score ${lead.score}`,
+                'No finance callback task on the record',
+              ]
+            : [
+                'Stage: proposal — commercials have been put to the customer',
+                'No finance callback task on the record',
+                'Inferred from the record — no payment question was captured',
+              ],
         impactCr: weightedValueCr(lead),
       }),
     )
@@ -476,23 +558,55 @@ const campaignAgent = defineAgent({
   detectSync(ctx) {
     const rows = selectCampaignRows(ctx.leads)
 
-    return rows
-      .filter((row) => row.bookingRate < 3)
+    /*
+     * An absolute rule and a relative one.
+     *
+     * Under 3% is a failing channel on any book. But a portfolio where every
+     * channel clears that bar left this agent silent, which reads as broken
+     * rather than as good news — so when nothing breaches the floor, the worst
+     * performers relative to the book's own average are reported instead.
+     * Marked inferred: "worse than its peers" is a weaker claim than "below the
+     * bar", and the weighting should say so.
+     */
+    const failing = rows.filter((row) => row.bookingRate < 3)
+    const withLeads = rows.filter((row) => row.leads > 0)
+    const portfolioRate = withLeads.length
+      ? withLeads.reduce((a, r) => a + r.bookingRate, 0) / withLeads.length
+      : 0
+    const laggards = failing.length
+      ? []
+      : withLeads.filter((row) => row.bookingRate < portfolioRate * 0.6)
+
+    return (failing.length ? failing : laggards)
       .sort((a, b) => a.bookingRate - b.bookingRate)
       .slice(0, MAX_FINDINGS)
       .map((row) => {
-        const verdict = row.bookingRate < 1 ? 'Pause' : 'Optimise'
-        const severity: Severity = row.bookingRate < 1 ? 'high' : 'medium'
+        const relative = failing.length === 0
+        const verdict = relative
+          ? 'underperforming'
+          : row.bookingRate < 1
+            ? 'pause'
+            : 'optimise'
+        const severity: Severity = relative
+          ? 'medium'
+          : row.bookingRate < 1
+            ? 'high'
+            : 'medium'
         return finding({
           id: `campaign-${row.id}`,
           subjectName: row.name,
           severity,
-          headline: `${row.name} — ${verdict.toLowerCase()} (booking rate ${row.bookingRate}%)`,
-          detail: `${row.leads.toLocaleString('en-IN')} leads produced a ${row.bookingRate}% booking rate at ₹${row.spendLakh} L spend.`,
+          signal: relative ? 'inferred' : 'stated',
+          headline: `${row.name} — ${verdict} (booking rate ${row.bookingRate}%)`,
+          detail: relative
+            ? `${row.leads.toLocaleString('en-IN')} leads at a ${row.bookingRate}% booking rate, against a portfolio average of ${portfolioRate.toFixed(1)}%.`
+            : `${row.leads.toLocaleString('en-IN')} leads produced a ${row.bookingRate}% booking rate at ₹${row.spendLakh} L spend.`,
           evidence: [
             `Qualified-lead rate ${row.qualifiedPct}%`,
             `Site-visit rate ${row.siteVisitPct}%`,
-            `Cost per qualified lead ₹${row.costPerQualifiedLakh} L`,
+            relative
+              ? `Portfolio average ${portfolioRate.toFixed(1)}% — no channel is below the 3% floor`
+              : `Cost per qualified lead ₹${row.costPerQualifiedLakh} L`,
           ],
         })
       })
@@ -611,36 +725,67 @@ const virtualSellingAgent = defineAgent({
   crmAction: 'Send the virtual tour and book a video walkthrough Task.',
 
   detectSync(ctx) {
-    const stalled = ctx.leads.filter((lead) => {
-      if (!isOpen(lead) || lead.dnd) return false
-      if (lead.evidence.siteVisitsAttended > 0) return false
-      const constrained = ctx.engagements.some(
-        (e) =>
-          e.leadId === lead.id &&
-          /cannot travel|video walkthrough|virtual|nri|before october|overseas/i.test(
-            `${e.subject} ${e.summary}`,
-          ),
+    /*
+     * Stated travel constraint, or a buyer who never came.
+     *
+     * The phrase only exists if a rep wrote it down. Engaged repeatedly, scoring
+     * well and never having attended a visit is the same blocker showing in the
+     * record instead of in the text.
+     */
+    const stalled = ctx.leads
+      .filter(
+        (lead) =>
+          isOpen(lead) && !lead.dnd && lead.evidence.siteVisitsAttended === 0,
       )
-      return constrained
-    })
-      .sort((a, b) => weightedValueCr(b) - weightedValueCr(a))
+      .map((lead) => {
+        const constrained = ctx.engagements.some(
+          (e) =>
+            e.leadId === lead.id &&
+            /cannot travel|video walkthrough|virtual|nri|before october|overseas/i.test(
+              `${e.subject} ${e.summary}`,
+            ),
+        )
+        if (constrained) return { lead, signal: 'stated' as const }
+        const touches = ctx.engagements.filter((e) => e.leadId === lead.id).length
+        return touches >= 2 && lead.score >= 60
+          ? { lead, signal: 'inferred' as const }
+          : null
+      })
+      .filter((r): r is { lead: Lead; signal: 'stated' | 'inferred' } => r !== null)
+      .sort((a, b) => weightedValueCr(b.lead) - weightedValueCr(a.lead))
 
-    return stalled.slice(0, MAX_FINDINGS).map((lead) =>
-      finding({
-        id: `virtual-${lead.id}`,
-        leadId: lead.id,
-        subjectName: lead.name,
-        severity: 'medium',
-        headline: `${lead.name} cannot attend a site visit — journey stalled at scheduling`,
-        detail: `Qualified buyer with a ₹${lead.budgetCr} Cr budget stuck for ${lead.evidence.daysSinceLastActivity} days on a logistics blocker.`,
-        evidence: [
-          'Travel constraint stated in the conversation record',
-          `${lead.evidence.websiteVisits} website sessions since — interest is still live`,
-          'No virtual alternative offered',
-        ],
-        impactCr: weightedValueCr(lead),
-      }),
-    )
+    return dedupeBySignal(stalled)
+      .slice(0, MAX_FINDINGS)
+      .map(({ lead, signal }) =>
+        finding({
+          id: `virtual-${lead.id}`,
+          leadId: lead.id,
+          subjectName: lead.name,
+          severity: 'medium',
+          signal,
+          headline:
+            signal === 'stated'
+              ? `${lead.name} cannot attend a site visit — journey stalled at scheduling`
+              : `${lead.name} is engaged but has never visited a site`,
+          detail:
+            signal === 'stated'
+              ? `Qualified buyer with a ₹${lead.budgetCr} Cr budget stuck for ${lead.evidence.daysSinceLastActivity} days on a logistics blocker.`
+              : `Score ${lead.score} on a ₹${lead.budgetCr} Cr budget, with no site visit attended after repeated contact.`,
+          evidence:
+            signal === 'stated'
+              ? [
+                  'Travel constraint stated in the conversation record',
+                  `${lead.evidence.websiteVisits} website sessions since — interest is still live`,
+                  'No virtual alternative offered',
+                ]
+              : [
+                  'No site visit attended on the record',
+                  `Score ${lead.score} · ${lead.evidence.websiteVisits} website sessions`,
+                  'Inferred from the record — no travel constraint was stated',
+                ],
+          impactCr: weightedValueCr(lead),
+        }),
+      )
   },
 
   async recommendAction(findings, ctx) {

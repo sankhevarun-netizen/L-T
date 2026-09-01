@@ -150,6 +150,16 @@ export interface AgentFinding {
    * a calibrated likelihood would be the dishonest version of this.
    */
   confidence?: number
+  /**
+   * Whether the customer said this, or the record only implies it.
+   *
+   * A field rather than careful phrasing, because phrasing depends on whoever
+   * writes the headline next and cannot be asserted. `inferred` findings are
+   * weighted lower and marked in the UI: a lead who answered a call and was
+   * never followed up is a real case, but it is not the same as one who said
+   * "call me back".
+   */
+  signal?: 'stated' | 'inferred'
   /** The specific records/behaviour that justified the finding. */
   evidence: string[]
   impactCr?: number
