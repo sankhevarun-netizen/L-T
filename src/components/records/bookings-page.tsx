@@ -12,19 +12,24 @@ import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { BreakdownList, type BreakdownRow } from '@/components/shared/breakdown-list'
 import { MiniColumns } from '@/components/shared/mini-columns'
 import { bucketByMonth, pct } from '@/lib/analysis'
-import { CAMPAIGNS, PROJECTS, REPS } from '@/data/reference'
+
 import { useCrmStore } from '@/store/crm-store'
 import { formatCrore, formatDate, formatNumber, formatPercentValue } from '@/lib/format'
 import type { Booking } from '@/types'
 import { cn } from '@/lib/utils'
+import { useReference } from '@/data/use-reference'
 
-const PROJECT_OPTIONS = PROJECTS.map((p) => ({ value: p.id, label: p.name }))
 const STATUS_OPTIONS = [
   { value: 'closed-won', label: 'closed won' },
   { value: 'booked', label: 'booked' },
 ]
 
 export function BookingsPage() {
+  const { campaigns, projects, reps } = useReference()
+  const projectOptions = useMemo(
+    () => projects.map((p) => ({ value: p.id, label: p.name })),
+    [projects],
+  )
   const router = useRouter()
   const bookings = useCrmStore((s) => s.bookings)
   const leadsById = useCrmStore((s) => s.leadsById)
@@ -141,7 +146,7 @@ export function BookingsPage() {
       .sort((a, b) => b[1].valueCr - a[1].valueCr)
       .map(([id, v]) => ({
         key: id,
-        label: CAMPAIGNS.find((c) => c.id === id)?.name ?? id,
+        label: campaigns.find((c) => c.id === id)?.name ?? id,
         caption: `${formatNumber(v.count)} bookings · avg ${formatCrore(v.valueCr / v.count, { decimals: 2 })}`,
         value: Math.round(v.valueCr),
         display: formatCrore(Math.round(v.valueCr)),
@@ -166,7 +171,7 @@ export function BookingsPage() {
       .sort((a, b) => b[1].valueCr - a[1].valueCr)
       .map(([id, v]) => ({
         key: id,
-        label: REPS.find((r) => r.id === id)?.name ?? id,
+        label: reps.find((r) => r.id === id)?.name ?? id,
         caption: `${formatNumber(v.count)} bookings · ${formatPercentValue(pct(v.valueCr, grand), 0)} of value`,
         value: Math.round(v.valueCr),
         display: formatCrore(Math.round(v.valueCr)),
@@ -217,7 +222,7 @@ export function BookingsPage() {
       header: 'Source campaign',
       render: (b) => {
         const lead = leadsById[b.leadId]
-        const campaign = CAMPAIGNS.find((c) => c.id === lead?.sourceCampaignId)
+        const campaign = campaigns.find((c) => c.id === lead?.sourceCampaignId)
         return (
           <span className="whitespace-nowrap text-[12px] text-slate-500">
             {campaign?.name ?? '—'}
@@ -315,7 +320,7 @@ export function BookingsPage() {
               setStatus('all')
             }}
             selects={[
-              { key: 'project', label: 'projects', value: project, options: PROJECT_OPTIONS, onChange: setProject },
+              { key: 'project', label: 'projects', value: project, options: projectOptions, onChange: setProject },
               { key: 'status', label: 'statuses', value: status, options: STATUS_OPTIONS, onChange: setStatus },
             ]}
           />

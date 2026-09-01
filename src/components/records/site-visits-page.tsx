@@ -13,19 +13,24 @@ import { StatusPill } from '@/components/shared/pills'
 import { BreakdownList, type BreakdownRow } from '@/components/shared/breakdown-list'
 import { MiniColumns } from '@/components/shared/mini-columns'
 import { bucketByMonth, pct } from '@/lib/analysis'
-import { PROJECTS } from '@/data/reference'
+
 import { useCrmStore } from '@/store/crm-store'
 import { formatDate, formatNumber, formatPercentValue } from '@/lib/format'
 import type { SiteVisit } from '@/types'
 import { cn } from '@/lib/utils'
+import { useReference } from '@/data/use-reference'
 
 const OUTCOME_OPTIONS = ['booked', 'considering', 'dropped', 'pending'].map(
   (o) => ({ value: o, label: o }),
 )
 
-const PROJECT_OPTIONS = PROJECTS.map((p) => ({ value: p.id, label: p.name }))
 
 export function SiteVisitsPage() {
+  const { projects } = useReference()
+  const projectOptions = useMemo(
+    () => projects.map((p) => ({ value: p.id, label: p.name })),
+    [projects],
+  )
   const router = useRouter()
   const siteVisits = useCrmStore((s) => s.siteVisits)
   const leadsById = useCrmStore((s) => s.leadsById)
@@ -102,7 +107,7 @@ export function SiteVisitsPage() {
 
   const byProject = useMemo(
     () =>
-      PROJECTS.map((p) => {
+      projects.map((p) => {
         const visits = siteVisits.filter((v) => v.projectId === p.id)
         const booked = visits.filter((v) => v.outcome === 'booked').length
         const considering = visits.filter((v) => v.outcome === 'considering').length
@@ -271,7 +276,7 @@ export function SiteVisitsPage() {
             }}
             selects={[
               { key: 'outcome', label: 'outcomes', value: outcome, options: OUTCOME_OPTIONS, onChange: setOutcome },
-              { key: 'project', label: 'projects', value: project, options: PROJECT_OPTIONS, onChange: setProject },
+              { key: 'project', label: 'projects', value: project, options: projectOptions, onChange: setProject },
             ]}
           />
 

@@ -24,6 +24,14 @@ export type RecordType =
   | 'surveyInvites'
   | 'surveyResponses'
   | 'recoveryCases'
+  // The reference sets. They describe the platform rather than its records, so
+  // they merge first and nothing validates a foreign key against them.
+  | 'projects'
+  | 'reps'
+  | 'campaigns'
+  | 'personas'
+  | 'themes'
+  | 'microMarkets'
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'string[]' | 'json'
 
@@ -243,9 +251,90 @@ export const SCHEMAS: Record<RecordType, RecordSchema> = {
       s('closureEvidence', true), s('sourceTicketId', true),
     ],
   },
+
+  /* ---------- reference sets ---------- */
+
+  projects: {
+    type: 'projects',
+    label: 'Projects',
+    signature: ['priceRangeCr', 'possession', 'unitTypes'],
+    refs: [],
+    dependsOn: [],
+    fields: [
+      s('id'), s('name'), s('location'),
+      sa('priceRangeCr'), s('possession'), sa('unitTypes'),
+    ],
+  },
+
+  reps: {
+    type: 'reps',
+    label: 'Sales reps',
+    signature: ['initials', 'territory'],
+    refs: [],
+    dependsOn: [],
+    fields: [s('id'), s('name'), s('initials'), s('territory')],
+  },
+
+  campaigns: {
+    type: 'campaigns',
+    label: 'Campaigns',
+    signature: ['spendLakh', 'headline', 'targets.leads'],
+    refs: [],
+    dependsOn: [],
+    fields: [
+      s('id'), s('name'), s('channel'), s('startedAt'),
+      n('spendLakh'), b('headline'),
+      n('targets.leads'), n('targets.qualified'), n('targets.siteVisits'),
+      n('targets.bookings'), n('targets.closedWon'),
+    ],
+  },
+
+  personas: {
+    type: 'personas',
+    label: 'Personas',
+    signature: ['motivations', 'objections', 'buyingTriggers', 'playbook'],
+    refs: [],
+    dependsOn: [],
+    fields: [
+      s('id'), s('name'), s('shortName'), s('description'),
+      s('budgetBand'), sa('budgetRangeCr'), s('typicalFamilySize'),
+      sa('motivations'), sa('objections'), sa('channels'), sa('buyingTriggers'),
+      sa('preferredProjectTypes'), sa('bestFitProjects'), s('playbook'), s('color'),
+    ],
+  },
+
+  themes: {
+    type: 'themes',
+    label: 'Feedback themes',
+    signature: ['aspect', 'keywords', 'suggestedCrmTag'],
+    refs: [],
+    dependsOn: [],
+    fields: [
+      s('id'), s('label'), s('aspect'), sa('keywords'), s('suggestedCrmTag'),
+      s('parentId', true), sa('excludes', true),
+    ],
+  },
+
+  microMarkets: {
+    type: 'microMarkets',
+    label: 'Micro-markets',
+    // A plain string list in the app; given an id here because every schema
+    // assumes one and the upsert keys on it.
+    signature: ['marketName'],
+    refs: [],
+    dependsOn: [],
+    fields: [s('id'), s('marketName')],
+  },
 }
 
 export const RECORD_TYPES = Object.keys(SCHEMAS) as RecordType[]
+
+/** The six sets that describe the platform rather than its records. */
+export const REFERENCE_TYPES: RecordType[] = [
+  'projects', 'reps', 'campaigns', 'personas', 'themes', 'microMarkets',
+]
+
+export const isReferenceType = (t: RecordType) => REFERENCE_TYPES.includes(t)
 
 /**
  * Merge order.
@@ -264,6 +353,9 @@ export function mergeOrder(types: RecordType[]): RecordType[] {
     for (const dep of SCHEMAS[t].dependsOn) if (wanted.has(dep)) visit(dep)
     out.push(t)
   }
+  // Reference sets first: they name the projects and reps everything else
+  // renders through, so anything drawn straight after a merge resolves.
+  for (const t of REFERENCE_TYPES) if (wanted.has(t)) visit(t)
   for (const t of RECORD_TYPES) if (wanted.has(t)) visit(t)
   return out
 }

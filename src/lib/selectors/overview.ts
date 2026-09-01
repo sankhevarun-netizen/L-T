@@ -1,4 +1,4 @@
-import { CAMPAIGNS, DEMO_NOW, MONTHLY_ROLLUPS, REPS } from '@/data/reference'
+import { DEMO_NOW, MONTHLY_ROLLUPS } from '@/data/reference'
 import { STAGE_PROBABILITY } from '@/data/generator'
 import type {
   Booking,
@@ -9,6 +9,7 @@ import type {
   SfTask,
   Trend,
 } from '@/types'
+import { ref } from '@/data/active-reference'
 
 /**
  * Every figure the Overview renders is computed here from the seed dataset.
@@ -262,7 +263,7 @@ const CAMPAIGN_TREND: Record<string, Trend> = {
 }
 
 export function selectCampaignRows(leads: Lead[]): CampaignRow[] {
-  return CAMPAIGNS.map((campaign) => {
+  return ref().campaigns.map((campaign) => {
     const owned = leads.filter((l) => l.sourceCampaignId === campaign.id)
     const qualified = owned.filter((l) => REACH.qualified.includes(l.stage)).length
     const siteVisits = owned.filter((l) => REACH.siteVisit.includes(l.stage)).length
@@ -391,7 +392,7 @@ export function selectNextBestActions(
     .slice(0, limit)
     .map((lead) => {
       const { action, icon } = nextBestActionFor(lead)
-      const rep = REPS.find((r) => r.id === lead.ownerId)
+      const rep = ref().reps.find((r) => r.id === lead.ownerId)
       return {
         id: `nba-${lead.id}`,
         leadId: lead.id,
@@ -477,7 +478,7 @@ export function selectRiskAlerts(
         sources (portals, brokers, walk-ins) are not campaigns you can retarget,
         so they are excluded from the recommendation. */
   const headlineIds = new Set(
-    CAMPAIGNS.filter((c) => c.headline).map((c) => c.id),
+    ref().campaigns.filter((c) => c.headline).map((c) => c.id),
   )
   const campaignRows = selectCampaignRows(leads).filter((c) =>
     headlineIds.has(c.id),

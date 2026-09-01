@@ -13,11 +13,12 @@ import { StatusPill } from '@/components/shared/pills'
 import { BreakdownList, type BreakdownRow } from '@/components/shared/breakdown-list'
 import { MiniColumns } from '@/components/shared/mini-columns'
 import { bucketByMonth, pct } from '@/lib/analysis'
-import { DEMO_NOW, REPS } from '@/data/reference'
+import { DEMO_NOW } from '@/data/reference'
 import { useCrmStore } from '@/store/crm-store'
 import { formatCrore, formatDate, formatNumber, formatPercentValue } from '@/lib/format'
 import type { Payment } from '@/types'
 import { cn } from '@/lib/utils'
+import { useReference } from '@/data/use-reference'
 
 const STATUS_OPTIONS = ['paid', 'due', 'overdue'].map((s) => ({
   value: s,
@@ -39,6 +40,7 @@ const AGEING_BUCKETS = [
 ]
 
 export function PaymentsPage() {
+  const { reps } = useReference()
   const router = useRouter()
   const payments = useCrmStore((s) => s.payments)
   const leadsById = useCrmStore((s) => s.leadsById)
@@ -442,7 +444,7 @@ export function PaymentsPage() {
                         </div>
                       </td>
                       <td className="py-2.5 pr-3 text-[12px] text-slate-500">
-                        {REPS.find((r) => r.id === a.lead?.ownerId)?.name ?? '—'}
+                        {reps.find((r) => r.id === a.lead?.ownerId)?.name ?? '—'}
                       </td>
                       <td className="nums py-2.5 pr-3 text-right text-[12.5px] text-slate-700">
                         {a.milestones}

@@ -33,6 +33,14 @@ export interface ImportPayload {
    */
   mode: 'merge' | 'replace'
   records: Partial<Record<RecordType, unknown[]>>
+  /**
+   * The reference sets in force when this was saved.
+   *
+   * Stored whole rather than as a diff. They are small, and a reload that
+   * restored the records but not the project and rep names would show the new
+   * client's book under the previous client's labels.
+   */
+  reference?: Record<string, unknown[]>
 }
 
 function openDb(): Promise<IDBDatabase | null> {
@@ -147,5 +155,7 @@ function validate(value: unknown): ImportPayload | null {
     savedAt: typeof p.savedAt === 'string' ? p.savedAt : '',
     mode: p.mode === 'replace' ? 'replace' : 'merge',
     records,
+    reference:
+      p.reference && typeof p.reference === 'object' ? p.reference : undefined,
   }
 }

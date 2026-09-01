@@ -6,9 +6,10 @@ import { Building2, CalendarCheck, IndianRupee, MapPin, Target } from 'lucide-re
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
-import { PROJECTS } from '@/data/reference'
+
 import { useCrmStore } from '@/store/crm-store'
 import { formatCrore, formatNumber, formatPercentValue } from '@/lib/format'
+import { useReference } from '@/data/use-reference'
 
 export interface ProjectRollup {
   id: string
@@ -28,13 +29,14 @@ export interface ProjectRollup {
 
 /** One roll-up per project, shared by the portfolio and the drill-in. */
 export function useProjectRollups(): ProjectRollup[] {
+  const { projects } = useReference()
   const leads = useCrmStore((s) => s.leads)
   const siteVisits = useCrmStore((s) => s.siteVisits)
   const bookings = useCrmStore((s) => s.bookings)
 
   return useMemo(
     () =>
-      PROJECTS.map((project) => {
+      projects.map((project) => {
         const visits = siteVisits.filter((v) => v.projectId === project.id)
         const attended = visits.filter((v) => v.attended)
         const booked = bookings.filter((b) => b.projectId === project.id)
@@ -64,6 +66,7 @@ export function useProjectRollups(): ProjectRollup[] {
 }
 
 export function ProjectsPortfolio() {
+  const { projects } = useReference()
   const router = useRouter()
   const rollups = useProjectRollups()
 

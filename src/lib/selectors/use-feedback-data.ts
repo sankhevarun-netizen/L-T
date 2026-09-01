@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 
-import { PERSONAS_BY_ID } from '@/data/personas'
+import { personaById } from '@/data/active-reference'
 import { useCrmStore } from '@/store/crm-store'
 import {
   selectCsatByTouchpoint,
@@ -63,7 +63,7 @@ export function useFeedbackData() {
       byPersona: selectSatisfactionByPersona(
         surveyResponses,
         themes,
-        (id) => PERSONAS_BY_ID[id]?.shortName ?? id,
+        (id) => personaById(id)?.shortName ?? id,
       ),
       byProject: selectSatisfactionByProject(surveyResponses, themes),
       issueTrends: selectIssueTrends(surveyResponses, themes),
@@ -78,11 +78,11 @@ export function useFeedbackData() {
       representation: selectRepresentation(
         surveyInvites,
         surveyResponses,
-        (id) => PERSONAS_BY_ID[id]?.shortName ?? id,
+        (id) => personaById(id)?.shortName ?? id,
       ),
       responseKnowledge: selectResponseKnowledge(
         surveyResponses,
-        (id) => PERSONAS_BY_ID[id]?.shortName ?? id,
+        (id) => personaById(id)?.shortName ?? id,
       ),
     }
   }, [surveyInvites, surveyResponses, recoveryCases])

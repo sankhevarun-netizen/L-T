@@ -1,8 +1,9 @@
-import { DEMO_NOW, REPS } from '@/data/reference'
+import { DEMO_NOW } from '@/data/reference'
 import type { AgentContext } from '@/lib/agents'
 import { findLeadByName } from './lookup'
 import type { CopilotReply } from './types'
 import type { ServiceTicket } from '@/types'
+import { ref } from '@/data/active-reference'
 
 /**
  * Service Assistant.
@@ -35,7 +36,7 @@ const RESOLUTION_PLAYS: Record<string, string> = {
 
 function ownerFor(ticket: ServiceTicket, ctx: AgentContext) {
   const lead = ctx.leads.find((l) => l.id === ticket.leadId)
-  const rep = REPS.find((r) => r.id === lead?.ownerId)
+  const rep = ref().reps.find((r) => r.id === lead?.ownerId)
   // Critical and breached tickets escalate beyond the owning rep.
   if (ticket.severity === 'critical' || slaDaysOverdue(ticket) > 0) {
     return `${rep?.name ?? 'Owner'} + Customer Care lead`
@@ -153,7 +154,7 @@ async function buildTicketReply(
         subject: `Resolve: ${e.ticket.subject} (${e.ticket.customerName})`,
         ownerId:
           ctx.leads.find((l) => l.id === e.ticket.leadId)?.ownerId ??
-          REPS[0].id,
+          ref().reps[0].id,
         dueInDays: e.slaDays > 0 ? 0 : 1,
         priority: 'High' as const,
       },

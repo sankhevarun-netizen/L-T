@@ -1,10 +1,11 @@
-import { DEMO_NOW, PROJECTS } from '@/data/reference'
-import { REPS } from '@/data/reference'
+import { DEMO_NOW } from '@/data/reference'
+
 import type { AgentContext } from '@/lib/agents'
 import { formatCrore } from '@/lib/format'
 import { detectChannel, findLeadByName } from './lookup'
 import type { CopilotReply } from './types'
 import type { Lead, Payment } from '@/types'
+import { ref } from '@/data/active-reference'
 
 /**
  * Payment Assistant.
@@ -25,14 +26,14 @@ const MILESTONES: [string, number, number][] = [
 
 function projectFor(lead: Lead) {
   return (
-    PROJECTS.find((p) => lead.interestedProjectIds.includes(p.id)) ??
-    PROJECTS.find((p) => p.location === lead.preferredLocation) ??
-    PROJECTS[0]
+    ref().projects.find((p) => lead.interestedProjectIds.includes(p.id)) ??
+    ref().projects.find((p) => p.location === lead.preferredLocation) ??
+    ref().projects[0]
   )
 }
 
 function repName(ownerId: string) {
-  return REPS.find((r) => r.id === ownerId)?.name ?? 'the owner'
+  return ref().reps.find((r) => r.id === ownerId)?.name ?? 'the owner'
 }
 
 /** Builds an indicative schedule for a lead with no booking on record. */

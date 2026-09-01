@@ -13,7 +13,7 @@ import { ScorePill } from '@/components/shared/score-pill'
 import { EvidencePill, IntentPill, StagePill } from '@/components/shared/pills'
 import { BreakdownList, type BreakdownRow } from '@/components/shared/breakdown-list'
 import { CrossTab } from '@/components/shared/cross-tab'
-import { CAMPAIGNS, REPS } from '@/data/reference'
+
 import { weightedValueCr } from '@/lib/selectors/overview'
 import { pct, shareBy } from '@/lib/analysis'
 import { useCrmStore } from '@/store/crm-store'
@@ -44,8 +44,6 @@ const EVIDENCE_OPTIONS = [
   'contradicted',
 ].map((e) => ({ value: e, label: e.replace('-', ' ') }))
 
-const OWNER_OPTIONS = REPS.map((r) => ({ value: r.id, label: r.name }))
-const CAMPAIGN_OPTIONS = CAMPAIGNS.map((c) => ({ value: c.id, label: c.name }))
 
 /** CRM statuses that assert live interest — the claims worth auditing. */
 const CLAIM_STATUSES: CrmStatus[] = [
@@ -94,6 +92,15 @@ export interface LeadsPageFilters {
 }
 
 export function LeadsPage({ initial = {} }: { initial?: LeadsPageFilters }) {
+  const { campaigns, reps } = useReference()
+  const ownerOptions = useMemo(
+    () => reps.map((r) => ({ value: r.id, label: r.name })),
+    [reps],
+  )
+  const campaignOptions = useMemo(
+    () => campaigns.map((c) => ({ value: c.id, label: c.name })),
+    [campaigns],
+  )
   const router = useRouter()
   const leads = useCrmStore((s) => s.leads)
 
@@ -228,7 +235,7 @@ export function LeadsPage({ initial = {} }: { initial?: LeadsPageFilters }) {
   /* ---------- Analysis: quality by source ---------- */
 
   const sourceRows: BreakdownRow[] = useMemo(() => {
-    const rows = CAMPAIGNS.map((c) => {
+    const rows = campaigns.map((c) => {
       const owned = leads.filter((l) => l.sourceCampaignId === c.id)
       const hot = owned.filter((l) => l.intent === 'high').length
       const backed = owned.filter((l) =>
@@ -327,7 +334,7 @@ export function LeadsPage({ initial = {} }: { initial?: LeadsPageFilters }) {
       render: (lead) => (
         <div className="flex justify-end">
           <OwnerChip
-            code={REPS.find((r) => r.id === lead.ownerId)?.initials ?? '—'}
+            code={reps.find((r) => r.id === lead.ownerId)?.initials ?? '—'}
           />
         </div>
       ),
@@ -439,8 +446,8 @@ export function LeadsPage({ initial = {} }: { initial?: LeadsPageFilters }) {
           { key: 'stage', label: 'stages', value: stage, options: STAGE_OPTIONS, onChange: setStage },
           { key: 'intent', label: 'intents', value: intent, options: INTENT_OPTIONS, onChange: setIntent },
           { key: 'evidence', label: 'evidence', value: evidence, options: EVIDENCE_OPTIONS, onChange: setEvidence },
-          { key: 'owner', label: 'owners', value: owner, options: OWNER_OPTIONS, onChange: setOwner },
-          { key: 'campaign', label: 'sources', value: campaign, options: CAMPAIGN_OPTIONS, onChange: setCampaign },
+          { key: 'owner', label: 'owners', value: owner, options: ownerOptions, onChange: setOwner },
+          { key: 'campaign', label: 'sources', value: campaign, options: campaignOptions, onChange: setCampaign },
         ]}
       />
 
@@ -503,3 +510,5 @@ export function LeadsPage({ initial = {} }: { initial?: LeadsPageFilters }) {
     </div>
   )
 }
+
+import { useReference } from '@/data/use-reference'

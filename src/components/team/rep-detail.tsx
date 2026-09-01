@@ -25,11 +25,12 @@ import { BACKLOG_THRESHOLD, selectRepStats } from '@/lib/selectors/team'
 import { isOpen } from '@/lib/selectors/overview'
 import { PIPELINE_STAGES, STALL_THRESHOLD_DAYS } from '@/lib/selectors/pipeline'
 import { median, pct } from '@/lib/analysis'
-import { CAMPAIGNS } from '@/data/reference'
+
 import { useCrmStore } from '@/store/crm-store'
 import { formatCrore, formatDate, formatNumber, formatPercentValue } from '@/lib/format'
 import type { Lead, SfTask } from '@/types'
 import { cn } from '@/lib/utils'
+import { useReference } from '@/data/use-reference'
 
 /** Validated ordinal ramp — single hue, monotone lightness. */
 const STAGE_RAMP = [
@@ -43,6 +44,7 @@ const STAGE_RAMP = [
 ]
 
 export function RepDetail({ repId }: { repId: string }) {
+  const { campaigns } = useReference()
   const router = useRouter()
   const leads = useCrmStore((s) => s.leads)
   const bookings = useCrmStore((s) => s.bookings)
@@ -107,7 +109,7 @@ export function RepDetail({ repId }: { repId: string }) {
     const max = rows[0]?.[1] ?? 1
     return rows.map(([id, count]) => ({
       id,
-      name: CAMPAIGNS.find((c) => c.id === id)?.name ?? id,
+      name: campaigns.find((c) => c.id === id)?.name ?? id,
       count,
       pct: (count / max) * 100,
     }))

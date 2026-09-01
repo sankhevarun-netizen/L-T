@@ -1,7 +1,6 @@
-import { SURVEY_QUESTIONS, THEME_DEFS, THEME_DEFS_BY_ID } from '@/data/feedback'
+import { SURVEY_QUESTIONS } from '@/data/feedback'
 import { DEMO_NOW, dayPartOf } from '@/data/reference'
-import { PERSONAS } from '@/data/personas'
-import { PROJECTS } from '@/data/reference'
+
 import { formatNumber } from '@/lib/format'
 import type {
   Engagement,
@@ -20,6 +19,7 @@ import type {
   TouchpointId,
 } from '@/types'
 import { TOUCHPOINT_LABEL, TOUCHPOINT_ORDER } from '@/types'
+import { ref, themeById } from '@/data/active-reference'
 
 /**
  * Feedback selectors.
@@ -301,7 +301,7 @@ export function selectSentimentBreakdown(
     negative: count('negative'),
     total: responses.length,
     themeCounts: [...counts.entries()]
-      .map(([id, n]) => ({ label: THEME_DEFS_BY_ID[id]?.label ?? id, count: n }))
+      .map(([id, n]) => ({ label: themeById(id)?.label ?? id, count: n }))
       .sort((a, b) => b.count - a.count),
   }
 }
@@ -313,7 +313,7 @@ export function selectSentimentBreakdown(
 /** Every theme whose keywords appear in the text and are not vetoed. */
 function matchThemes(verbatim: string) {
   const text = verbatim.toLowerCase()
-  return THEME_DEFS.filter((def) => {
+  return ref().themes.filter((def) => {
     if (def.excludes?.some((phrase) => text.includes(phrase))) return false
     return def.keywords.some((keyword) => text.includes(keyword))
   })
@@ -393,7 +393,7 @@ export function selectThemes(responses: SurveyResponse[]): FeedbackTheme[] {
 
   return [...acc.entries()]
     .map(([id, entry]) => {
-      const def = THEME_DEFS_BY_ID[id]
+      const def = themeById(id)
       const rows = entry.responseIds
         .map((rid) => responsesById.get(rid))
         .filter((r): r is SurveyResponse => Boolean(r))
@@ -437,7 +437,7 @@ export function selectThemesForResponse(
   response: SurveyResponse,
   themes: FeedbackTheme[],
 ): FeedbackTheme[] {
-  const defsById = Object.fromEntries(THEME_DEFS.map((d) => [d.id, d]))
+  const defsById = Object.fromEntries(ref().themes.map((d) => [d.id, d]))
   return themes
     .filter((theme) => theme.responseIds.includes(response.id))
     .map((theme) => ({
@@ -892,7 +892,7 @@ export function selectInterventions(
 
   const ranked = clusters
     .map((cluster, i) => {
-      const aspect = THEME_DEFS_BY_ID[cluster.themeIds[0]]?.aspect ?? 'Service'
+      const aspect = themeById(cluster.themeIds[0])?.aspect ?? 'Service'
       const dragNorm = Math.abs(cluster.npsDrag) / maxDrag
       const volumeNorm =
         Math.log10(1 + cluster.affectedResponses) / Math.log10(1 + maxVolume)
@@ -1077,7 +1077,7 @@ export function selectRepresentation(
   const askedStages = new Set(invites.filter((i) => i.sentAt).map((i) => i.journeyStage))
   const heardStages = new Set(responses.map((r) => r.journeyStage))
 
-  const askedPersonas = new Set(PERSONAS.map((p) => p.id))
+  const askedPersonas = new Set(ref().personas.map((p) => p.id))
   const heardPersonas = new Set(
     responses.map((r) => r.personaId).filter((id): id is string => Boolean(id)),
   )
@@ -1175,7 +1175,7 @@ export function selectDataInputs(input: {
     {
       label: 'Customer and project profile',
       value: formatNumber(leads.length),
-      detail: `${PROJECTS.length} projects · ${PERSONAS.length} personas mapped`,
+      detail: `${ref().projects.length} projects · ${ref().personas.length} personas mapped`,
       usedFor: 'Who exists, and which persona and stage they sit in',
     },
     {

@@ -17,8 +17,8 @@ import { SeverityPill } from '@/components/shared/pills'
 import { HumanReviewNote } from './guardrails'
 import { caseSlaDaysOverdue } from '@/lib/selectors/feedback'
 import { useFeedbackData } from '@/lib/selectors/use-feedback-data'
-import { THEME_DEFS_BY_ID } from '@/data/feedback'
-import { REPS } from '@/data/reference'
+
+
 import { formatDate, formatNumber } from '@/lib/format'
 import { useCrmStore } from '@/store/crm-store'
 import { TOUCHPOINT_LABEL } from '@/types'
@@ -79,6 +79,7 @@ function draftFor(response: SurveyResponse, play: string) {
 }
 
 export function DetractorRecovery() {
+  const { reps } = useReference()
   const { recoveryQueue, recovery, cases, themes } = useFeedbackData()
   const createRecoveryCase = useCrmStore((s) => s.createRecoveryCase)
   const updateRecoveryCase = useCrmStore((s) => s.updateRecoveryCase)
@@ -96,7 +97,7 @@ export function DetractorRecovery() {
   const play = RECOVERY_PLAYS[aspect] ?? RECOVERY_PLAYS.Service
 
   const owner = active
-    ? REPS.find((r) => r.id === (cases.find((c) => c.responseId === active.response.id)?.ownerId))
+    ? reps.find((r) => r.id === (cases.find((c) => c.responseId === active.response.id)?.ownerId))
     : undefined
 
   const openCases = cases
@@ -340,7 +341,7 @@ export function DetractorRecovery() {
                     createRecoveryCase({
                       responseId: active.response.id,
                       leadId: active.response.leadId,
-                      ownerId: owner?.id ?? REPS[0].id,
+                      ownerId: owner?.id ?? reps[0].id,
                       severity: severityFor(active.response.npsScore),
                       themeId: activeThemes[0]?.id ?? '',
                       slaDays: slaDaysFor(active.response.npsScore),
@@ -391,7 +392,7 @@ export function DetractorRecovery() {
             {openCases.map((recoveryCase) => {
               const overdue = caseSlaDaysOverdue(recoveryCase)
               const themeLabel =
-                THEME_DEFS_BY_ID[recoveryCase.themeId]?.label ?? '—'
+                themeById(recoveryCase.themeId)?.label ?? '—'
               return (
                 <li
                   key={recoveryCase.id}
@@ -443,3 +444,6 @@ export function DetractorRecovery() {
     </div>
   )
 }
+
+import { useReference } from '@/data/use-reference'
+import { themeById } from '@/data/active-reference'

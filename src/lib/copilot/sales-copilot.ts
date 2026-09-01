@@ -1,4 +1,4 @@
-import { PROJECTS, REPS } from '@/data/reference'
+
 import type { AgentContext } from '@/lib/agents'
 import {
   isAtRisk,
@@ -11,6 +11,7 @@ import { formatCrore, formatNumber } from '@/lib/format'
 import { detectChannel, findLeadByName } from './lookup'
 import type { CopilotAction, CopilotReply } from './types'
 import type { Lead } from '@/types'
+import { ref } from '@/data/active-reference'
 
 /**
  * Sales Copilot intent routing.
@@ -41,13 +42,13 @@ function classify(query: string): Intent {
 }
 
 function repName(ownerId: string) {
-  return REPS.find((r) => r.id === ownerId)?.name ?? 'the owner'
+  return ref().reps.find((r) => r.id === ownerId)?.name ?? 'the owner'
 }
 
 function projectFor(lead: Lead) {
   return (
-    PROJECTS.find((p) => lead.interestedProjectIds.includes(p.id))?.name ??
-    PROJECTS.find((p) => p.location === lead.preferredLocation)?.name
+    ref().projects.find((p) => lead.interestedProjectIds.includes(p.id))?.name ??
+    ref().projects.find((p) => p.location === lead.preferredLocation)?.name
   )
 }
 

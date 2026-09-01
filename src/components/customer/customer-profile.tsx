@@ -25,8 +25,8 @@ import { AgentBriefPanel } from './agent-brief-panel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { ScorePill } from '@/components/shared/score-pill'
-import { PERSONAS_BY_ID } from '@/data/personas'
-import { PROJECTS, REPS } from '@/data/reference'
+
+
 import { agentforceVsDice } from '@/lib/crm'
 import { usePersonaFor } from '@/lib/personas/use-persona-map'
 import { selectThemesForResponse } from '@/lib/selectors/feedback'
@@ -61,6 +61,7 @@ const MILESTONES = [
 ] as const
 
 export function CustomerProfile({ leadId }: { leadId: string }) {
+  const { projects, reps } = useReference()
   const feedback = useFeedbackForLead(leadId)
   const { themes } = useFeedbackData()
   const lead = useCrmStore((s) => s.leadsById[leadId])
@@ -103,14 +104,14 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
     .reverse()
     .find((e) => e.channel === 'call' || e.channel === 'whatsapp')
 
-  const persona = assignment ? PERSONAS_BY_ID[assignment.best.personaId] : null
-  const rep = REPS.find((r) => r.id === lead.ownerId)
+  const persona = assignment ? personaById(assignment.best.personaId) : null
+  const rep = reps.find((r) => r.id === lead.ownerId)
   const comparison = agentforceVsDice(lead)
   const { action } = nextBestActionFor(lead)
   const objection = visits.find((v) => v.objection)?.objection
   const currentIndex = STAGE_ORDER.indexOf(lead.stage)
 
-  const interestedProjects = PROJECTS.filter((p) =>
+  const interestedProjects = projects.filter((p) =>
     lead.interestedProjectIds.includes(p.id),
   )
 
@@ -492,7 +493,7 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
                     </p>
                     <p className="mt-1 text-[12.5px] font-semibold capitalize text-slate-800">
                       {feedback.cases[0].status} ·{' '}
-                      {REPS.find((r) => r.id === feedback.cases[0].ownerId)?.name ??
+                      {reps.find((r) => r.id === feedback.cases[0].ownerId)?.name ??
                         'Customer Care'}
                     </p>
                     <p className="mt-0.5 text-[11.5px] leading-snug text-slate-500">
@@ -785,3 +786,6 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
     </div>
   )
 }
+
+import { useReference } from '@/data/use-reference'
+import { personaById } from '@/data/active-reference'

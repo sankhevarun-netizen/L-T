@@ -1,7 +1,8 @@
-import { REPS } from '@/data/reference'
+
 import type { Booking, Lead, SfTask } from '@/types'
 import { isOpen } from './overview'
 import { STALL_THRESHOLD_DAYS } from './pipeline'
+import { ref } from '@/data/active-reference'
 
 /** Reps above this open-task count get flagged as overloaded. */
 export const BACKLOG_THRESHOLD = 50
@@ -33,7 +34,7 @@ export function selectRepStats(
 ): RepStats[] {
   const bookingByLead = new Map(bookings.map((b) => [b.leadId, b]))
 
-  return REPS.map((rep) => {
+  return ref().reps.map((rep) => {
     const owned = leads.filter((l) => l.ownerId === rep.id)
     const open = owned.filter(isOpen)
     const won = owned.filter((l) => l.stage === 'closed-won')

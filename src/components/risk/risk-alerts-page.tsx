@@ -18,13 +18,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatTile } from '@/components/shared/stat-tile'
 import { InitialsAvatar, OwnerChip } from '@/components/shared/initials-avatar'
 import { ScorePill } from '@/components/shared/score-pill'
-import { REPS } from '@/data/reference'
+
 import { executeWrite, riskDigest, useAgentContext } from '@/lib/agents'
 import { isAtRisk, weightedValueCr } from '@/lib/selectors/overview'
 import { useCrmStore } from '@/store/crm-store'
 import { formatCrore, formatNumber } from '@/lib/format'
 import type { Severity } from '@/types'
 import { cn } from '@/lib/utils'
+import { useReference } from '@/data/use-reference'
 
 const SEVERITY: Record<
   Severity,
@@ -57,6 +58,7 @@ const SEVERITY: Record<
 }
 
 export function RiskAlertsPage() {
+  const { reps } = useReference()
   const ctx = useAgentContext()
   const activities = useCrmStore((s) => s.activities)
   const [handled, setHandled] = useState<Record<string, string>>({})
@@ -265,7 +267,7 @@ export function RiskAlertsPage() {
               </thead>
               <tbody>
                 {atRiskLeads.map((lead) => {
-                  const rep = REPS.find((r) => r.id === lead.ownerId)
+                  const rep = reps.find((r) => r.id === lead.ownerId)
                   const reason =
                     lead.evidenceStatus === 'contradicted'
                       ? `CRM says "${lead.crmStatus}" with no supporting evidence`

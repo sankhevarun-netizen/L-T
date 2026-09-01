@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react'
 
-import { CAMPAIGNS } from '@/data/reference'
 import { useAIService } from '@/lib/ai/use-ai-service'
 import {
   selectRootCauseClusters,
@@ -10,6 +9,7 @@ import {
 } from '@/lib/selectors/feedback'
 import { useCrmStore } from '@/store/crm-store'
 import type { AgentContext } from './types'
+import { ref } from '@/data/active-reference'
 
 /** Assembles everything the agents can see from the live CRM store. */
 export function useAgentContext(): AgentContext {
@@ -36,7 +36,7 @@ export function useAgentContext(): AgentContext {
       payments,
       serviceTickets,
       tasks,
-      campaigns: CAMPAIGNS,
+      campaigns: ref().campaigns,
       ingestedLeadIds,
       surveyInvites,
       surveyResponses,

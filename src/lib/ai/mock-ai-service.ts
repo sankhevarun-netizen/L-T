@@ -1,4 +1,4 @@
-import { THEME_DEFS, THEME_DEFS_BY_ID } from '@/data/feedback'
+
 import type {
   AICoachingInput,
   AICoachingResult,
@@ -14,6 +14,7 @@ import type {
   AISummaryResult,
   AIThemeExtraction,
 } from './types'
+import { ref, themeById } from '@/data/active-reference'
 
 /**
  * Deterministic-but-varied mock AI.
@@ -422,7 +423,7 @@ export class MockAIService implements AIService {
 
     for (const verbatim of verbatims) {
       const text = verbatim.toLowerCase()
-      for (const def of THEME_DEFS) {
+      for (const def of ref().themes) {
         if (def.excludes?.some((phrase) => text.includes(phrase))) continue
         if (!def.keywords.some((keyword) => text.includes(keyword))) continue
 
@@ -437,7 +438,7 @@ export class MockAIService implements AIService {
     const themes = [...acc.entries()]
       .sort((a, b) => b[1].total - a[1].total)
       .map(([id, entry]) => {
-        const def = THEME_DEFS_BY_ID[id]
+        const def = themeById(id)
         const negativeShare = entry.total ? entry.negative / entry.total : 0
         return {
           label: def.label,

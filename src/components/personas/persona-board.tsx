@@ -9,15 +9,18 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { ScorePill } from '@/components/shared/score-pill'
-import { PERSONAS, PERSONAS_BY_ID } from '@/data/personas'
+
 import { usePersonaMap } from '@/lib/personas/use-persona-map'
 import { formatCrore, formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useReference } from '@/data/use-reference'
+import { personaById } from '@/data/active-reference'
 
 /** How many leads each column lists before the "+N more" line. */
 const COLUMN_PREVIEW = 6
 
 export function PersonaBoard() {
+  const { personas } = useReference()
   const { assignments, buckets, mappedCount } = usePersonaMap()
   const [query, setQuery] = useState('')
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
@@ -46,7 +49,7 @@ export function PersonaBoard() {
             AI Persona Mapping
           </h2>
           <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-white/60">
-            Every open lead scored against {PERSONAS.length} buyer personas from
+            Every open lead scored against {personas.length} buyer personas from
             its attributes and behaviour — with the signals that drove the
             assignment kept on the record.
           </p>
@@ -74,9 +77,9 @@ export function PersonaBoard() {
               <ul className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-card-hover">
                 {searchResults.map((lead) => {
                   const persona =
-                    PERSONAS_BY_ID[
+                    personaById(
                       assignments.get(lead.id)?.best.personaId ?? ''
-                    ]
+                    )
                   return (
                     <li key={lead.id}>
                       <button
@@ -133,7 +136,7 @@ export function PersonaBoard() {
       <div className="scrollbar-slim overflow-x-auto pb-2">
         <div className="grid min-w-[1100px] grid-cols-6 gap-3">
           {buckets.map((bucket) => {
-            const persona = PERSONAS_BY_ID[bucket.personaId]
+            const persona = personaById(bucket.personaId)
             return (
               <Card
                 key={bucket.personaId}
@@ -237,7 +240,7 @@ export function PersonaBoard() {
       <Card className="p-5">
         <h3 className="section-title mb-3">Persona reference</h3>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {PERSONAS.map((persona) => (
+          {personas.map((persona) => (
             <div
               key={persona.id}
               className="rounded-lg border border-slate-200 p-3.5"

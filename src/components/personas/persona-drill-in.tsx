@@ -7,11 +7,12 @@ import { CircleCheck, ExternalLink, Loader2, Sparkles } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { InitialsAvatar } from '@/components/shared/initials-avatar'
 import { ScorePill } from '@/components/shared/score-pill'
-import { PERSONAS_BY_ID } from '@/data/personas'
+
 import { useAIService } from '@/lib/ai/use-ai-service'
 import { explainPersonaMatch } from '@/lib/personas/mapping'
 import { useCrmStore } from '@/store/crm-store'
 import { formatCrore } from '@/lib/format'
+import { personaById } from '@/data/active-reference'
 
 /**
  * Why a lead landed on a persona.
@@ -55,9 +56,9 @@ export function PersonaDrillIn({ leadId }: { leadId: string }) {
   if (!lead) return null
 
   const { assignment, rationale, loading } = state
-  const persona = assignment ? PERSONAS_BY_ID[assignment.best.personaId] : null
+  const persona = assignment ? personaById(assignment.best.personaId) : null
   const runnerUp = assignment?.runnerUp
-    ? PERSONAS_BY_ID[assignment.runnerUp.personaId]
+    ? personaById(assignment.runnerUp.personaId)
     : null
 
   return (

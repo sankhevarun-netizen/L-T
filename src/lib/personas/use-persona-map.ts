@@ -2,11 +2,11 @@
 
 import { useMemo } from 'react'
 
-import { PERSONAS } from '@/data/personas'
 import { isOpen } from '@/lib/selectors/overview'
 import { useCrmStore } from '@/store/crm-store'
 import type { Customer, Engagement, Lead, PersonaAssignment } from '@/types'
 import { mapBook, mapLeadToPersonas } from './mapping'
+import { ref } from '@/data/active-reference'
 
 export interface PersonaBucket {
   personaId: string
@@ -37,7 +37,7 @@ export function usePersonaMap() {
     const openLeads = leads.filter(isOpen)
     const assignments = mapBook(openLeads, customersById, engagementsByLead)
 
-    const buckets: PersonaBucket[] = PERSONAS.map((persona) => {
+    const buckets: PersonaBucket[] = ref().personas.map((persona) => {
       const bucketLeads = openLeads.filter(
         (l) => assignments.get(l.id)?.best.personaId === persona.id,
       )

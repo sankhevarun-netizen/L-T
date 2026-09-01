@@ -4,8 +4,8 @@ import { create } from 'zustand'
 
 import { buildSeedDataset } from '@/data/generator'
 import { DATA_SOURCE_SEEDS, buildFeedback } from '@/data/feedback-generator'
-import { DEMO_NOW, REPS } from '@/data/reference'
-import { THEME_DEFS_BY_ID } from '@/data/feedback'
+import { DEMO_NOW } from '@/data/reference'
+import { ref, themeById, resetActiveReference, setActiveReference } from '@/data/active-reference'
 import type {
   Booking,
   TouchpointId,
@@ -24,7 +24,11 @@ import type {
 } from '@/types'
 import { TOUCHPOINT_LABEL } from '@/types'
 import type { RecordType } from '@/lib/ingestion/schemas'
-import { mergeOrder } from '@/lib/ingestion/schemas'
+import {
+  isReferenceType,
+  mergeOrder,
+  REFERENCE_TYPES,
+} from '@/lib/ingestion/schemas'
 import {
   clearImports,
   readImports,
@@ -73,12 +77,21 @@ function persistImports(state: CrmState, mode: 'merge' | 'replace') {
     const mine = rows.filter((r) => r.importedBatchId)
     if (mine.length) records[type] = mine
   }
+  const current = ref()
   const payload: ImportPayload = {
     version: 1,
     batchIds: state.importedBatchIds,
     savedAt: new Date().toISOString(),
     mode,
     records,
+    reference: {
+      projects: current.projects,
+      reps: current.reps,
+      campaigns: current.campaigns,
+      personas: current.personas,
+      themes: current.themes,
+      microMarkets: current.microMarkets,
+    },
   }
   return writeImports(payload)
 }
@@ -105,6 +118,14 @@ export interface CrmState {
   ingestedLeadIds: string[]
   /** Batches of imported CSV data currently merged into the book. */
   importedBatchIds: string[]
+  /**
+   * Bumped whenever the reference sets change.
+   *
+   * The sets themselves live in `active-reference`, not here — two copies that
+   * must be kept in step is the drift this design avoids. This counter exists
+   * only so components can subscribe and re-render.
+   */
+  referenceVersion: number
 
   /* ---- writes ---- */
   updateLead: (
@@ -210,7 +231,7 @@ function recoveryCaseDetail(
   recoveryCase: RecoveryCase,
   response: SurveyResponse | undefined,
 ): string {
-  const owner = REPS.find((r) => r.id === recoveryCase.ownerId)?.name ?? 'Customer Care'
+  const owner = ref().reps.find((r) => r.id === recoveryCase.ownerId)?.name ?? 'Customer Care'
 
   /*
    * Leads with a quoted fragment of the verbatim, not the theme. The theme
@@ -222,7 +243,7 @@ function recoveryCaseDetail(
    */
   const quote = response
     ? `"${response.verbatim.slice(0, 64)}${response.verbatim.length > 64 ? '…' : ''}"`
-    : THEME_DEFS_BY_ID[recoveryCase.themeId]?.label ?? `${recoveryCase.severity} severity`
+    : themeById(recoveryCase.themeId)?.label ?? `${recoveryCase.severity} severity`
 
   const touchpoint = response
     ? TOUCHPOINT_LABEL[response.touchpoint as TouchpointId]
@@ -280,6 +301,7 @@ function seedState(source: 'example' | 'client' = 'example') {
     // Only leads whose history has been ingested can be reasoned over.
     ingestedLeadIds: data.leads.filter((l) => l.ingested).map((l) => l.id),
     importedBatchIds: [] as string[],
+    referenceVersion: 0,
   }
 }
 
@@ -499,7 +521,31 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         next.activities = []
       }
 
+      /*
+       * The reference sets are applied before the records, so anything drawn
+       * immediately afterwards resolves project and rep names against the new
+       * set rather than the one being replaced.
+       *
+       * They do not live in this store — `active-reference` holds them, and
+       * `referenceVersion` exists only so components can subscribe. Two copies
+       * that must be kept in step is the drift this avoids.
+       */
+      const referenceUpdate: Record<string, unknown[]> = {}
+      for (const type of REFERENCE_TYPES) {
+        const rows = records[type]
+        if (rows?.length) {
+          referenceUpdate[type === 'microMarkets' ? 'microMarkets' : type] =
+            type === 'microMarkets'
+              ? rows.map((r) => (r as unknown as { marketName?: string }).marketName ?? r.id)
+              : rows
+        }
+      }
+      if (replace) resetActiveReference()
+      if (Object.keys(referenceUpdate).length) setActiveReference(referenceUpdate)
+      const referenceChanged = replace || Object.keys(referenceUpdate).length > 0
+
       for (const type of mergeOrder(Object.keys(records) as RecordType[])) {
+        if (isReferenceType(type)) continue
         const incoming = records[type]
         if (!incoming?.length) continue
 
@@ -530,6 +576,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       next.importedBatchIds = replace
         ? [meta.batchId]
         : [...state.importedBatchIds, meta.batchId]
+      if (referenceChanged) next.referenceVersion = state.referenceVersion + 1
       next.activities = [
         {
           id: nextId('ACT', activitySeq),
@@ -550,6 +597,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
 
   clearImportedData: () => {
     void clearImports()
+    resetActiveReference()
     set((state) => {
       const next = { ...state } as Record<string, unknown>
       for (const type of IMPORTABLE_TYPES) {
@@ -564,6 +612,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         leadsById: byId,
         ingestedLeadIds: leads.filter((l) => l.ingested).map((l) => l.id),
         importedBatchIds: [],
+        referenceVersion: state.referenceVersion + 1,
       }
     })
   },
@@ -571,6 +620,12 @@ export const useCrmStore = create<CrmState>((set, get) => ({
   rehydrateImports: async () => {
     const payload = await readImports()
     if (!payload) return
+    // Sets first: importRecords applies them, but restoring them here as well
+    // covers a payload that carried sets and no records.
+    if (payload.reference) {
+      setActiveReference(payload.reference as never)
+      set((s) => ({ referenceVersion: s.referenceVersion + 1 }))
+    }
     const records = payload.records as Partial<Record<RecordType, { id: string }[]>>
     if (!Object.keys(records).length) return
     get().importRecords(records, {
@@ -589,7 +644,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     recoverySeq += 1
     const response = get().surveyResponses.find((r) => r.id === input.responseId)
     const name = response?.customerName ?? input.leadId
-    const owner = REPS.find((r) => r.id === input.ownerId)?.name ?? 'Customer Care'
+    const owner = ref().reps.find((r) => r.id === input.ownerId)?.name ?? 'Customer Care'
 
     const recoveryCase: RecoveryCase = {
       id: nextId('REC-NEW', recoverySeq),
@@ -862,7 +917,13 @@ export const useCrmStore = create<CrmState>((set, get) => ({
      * the likeliest bug in this feature, so the two are done together.
      */
     void clearImports()
+    // The sets go back with the records; a reset that restored the book but
+    // kept another client's project names would not be a reset.
+    resetActiveReference()
     // Back to variant 0 -- the book every rehearsed number refers to.
-    set(seedState(source))
+    set((state) => ({
+      ...seedState(source),
+      referenceVersion: state.referenceVersion + 1,
+    }))
   },
 }))

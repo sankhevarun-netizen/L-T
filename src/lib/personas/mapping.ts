@@ -1,4 +1,4 @@
-import { PERSONAS, PERSONAS_BY_ID } from '@/data/personas'
+
 import type { AIService } from '@/lib/ai'
 import type {
   Customer,
@@ -8,6 +8,7 @@ import type {
   PersonaAssignment,
   PersonaMatch,
 } from '@/types'
+import { ref, personaById } from '@/data/active-reference'
 
 /**
  * Persona mapping engine.
@@ -165,7 +166,7 @@ const RULES: Rule[] = [
 
 /** Scores one lead against every persona. */
 export function mapLeadToPersonas(input: MappingInput): PersonaAssignment {
-  const matches: PersonaMatch[] = PERSONAS.map((persona) => {
+  const matches: PersonaMatch[] = ref().personas.map((persona) => {
     const signals: string[] = []
     let rawScore = 6 // small floor so no persona scores zero
 
@@ -210,7 +211,7 @@ export async function explainPersonaMatch(
   ai: AIService,
 ): Promise<{ assignment: PersonaAssignment; rationale: string }> {
   const assignment = mapLeadToPersonas(input)
-  const persona = PERSONAS_BY_ID[assignment.best.personaId]
+  const persona = personaById(assignment.best.personaId)
 
   const { text } = await ai.complete({
     system: 'You are a real-estate CRM analyst explaining a persona assignment.',

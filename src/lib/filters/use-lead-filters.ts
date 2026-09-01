@@ -2,11 +2,10 @@
 
 import { useMemo, useState } from 'react'
 
-import { CAMPAIGNS, MICRO_MARKETS, REPS } from '@/data/reference'
-import { PERSONAS } from '@/data/personas'
 import { mapLeadToPersonas } from '@/lib/personas/mapping'
 import { useCrmStore } from '@/store/crm-store'
 import type { Customer, Engagement, Lead } from '@/types'
+import { ref } from '@/data/active-reference'
 
 export interface LeadFilters {
   market: string
@@ -35,22 +34,22 @@ export const FILTER_OPTIONS: {
   {
     key: 'market',
     label: 'Micro-market',
-    options: MICRO_MARKETS.map((m) => ({ value: m, label: m })),
+    options: ref().microMarkets.map((m) => ({ value: m, label: m })),
   },
   {
     key: 'campaign',
     label: 'Campaign',
-    options: CAMPAIGNS.map((c) => ({ value: c.id, label: c.name })),
+    options: ref().campaigns.map((c) => ({ value: c.id, label: c.name })),
   },
   {
     key: 'rep',
     label: 'Owner',
-    options: REPS.map((r) => ({ value: r.id, label: r.name })),
+    options: ref().reps.map((r) => ({ value: r.id, label: r.name })),
   },
   {
     key: 'persona',
     label: 'Persona',
-    options: PERSONAS.map((p) => ({ value: p.id, label: p.name })),
+    options: ref().personas.map((p) => ({ value: p.id, label: p.name })),
   },
 ]
 

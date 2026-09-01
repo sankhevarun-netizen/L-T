@@ -1,5 +1,5 @@
-import { REPS } from '@/data/reference'
-import { THEME_DEFS_BY_ID } from '@/data/feedback'
+
+
 import {
   caseSlaDaysOverdue,
   selectRecoverySummary,
@@ -11,6 +11,7 @@ import { TOUCHPOINT_LABEL } from '@/types'
 import type { Severity } from '@/types'
 import { defineAgent, finding, plan } from './registry'
 import type { Agent, AgentContext } from './types'
+import { ref, themeById } from '@/data/active-reference'
 
 /**
  * The CSAT & NPS agents.
@@ -265,7 +266,7 @@ const rootCauseAgent = defineAgent({
   async recommendAction(findings, ctx) {
     return findings.map((f) => {
       const cluster = ctx.feedbackClusters.find((c) => `cause-${c.id}` === f.id)
-      const aspect = THEME_DEFS_BY_ID[cluster?.themeIds[0] ?? '']?.aspect ?? 'Service'
+      const aspect = themeById(cluster?.themeIds[0] ?? '')?.aspect ?? 'Service'
       /*
        * Logged against the cluster rather than raised as a Task.
        *
@@ -393,13 +394,13 @@ const detractorRecoveryAgent = defineAgent({
         'Open a recovery case with an owner and SLA',
         'A detractor with no owner and no deadline is a customer who hears nothing.',
         `Recovery case opened · owner ${
-          REPS.find((r) => r.id === lead?.ownerId)?.name ?? 'Customer Care'
+          ref().reps.find((r) => r.id === lead?.ownerId)?.name ?? 'Customer Care'
         } · SLA ${slaDays} day(s)`,
         {
           kind: 'create-recovery-case',
           responseId: response?.id ?? '',
           leadId: f.leadId!,
-          ownerId: lead?.ownerId ?? REPS[0].id,
+          ownerId: lead?.ownerId ?? ref().reps[0].id,
           severity: f.severity,
           themeId: theme?.id ?? '',
           slaDays,
@@ -496,7 +497,7 @@ const controlTowerAgent = defineAgent({
             kind: 'create-task',
             leadId: f.leadId ?? '',
             subject: `Escalated recovery — ${f.subjectName}`,
-            ownerId: REPS[0].id,
+            ownerId: ref().reps[0].id,
             dueInDays: 1,
             priority: 'High',
           },

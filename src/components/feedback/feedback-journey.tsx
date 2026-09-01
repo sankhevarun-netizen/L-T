@@ -9,7 +9,7 @@ import { StagePill } from '@/components/shared/pills'
 import { HumanReviewNote, LockedQuestionBadge } from './guardrails'
 import { CONDITIONAL_FOLLOW_UPS } from '@/data/feedback'
 import { composeQuestions } from '@/lib/selectors/feedback'
-import { PERSONAS_BY_ID } from '@/data/personas'
+
 import { usePersonaFor } from '@/lib/personas/use-persona-map'
 import { useCrmStore } from '@/store/crm-store'
 import { STAGE_ORDER, TOUCHPOINT_LABEL, TOUCHPOINT_ORDER } from '@/types'
@@ -102,7 +102,7 @@ export function FeedbackJourney() {
 
   const lead = leads.find((l) => l.id === leadId) ?? authored[0]
   const assignment = usePersonaFor(leadId)
-  const persona = assignment ? PERSONAS_BY_ID[assignment.best.personaId] : undefined
+  const persona = assignment ? personaById(assignment.best.personaId) : undefined
 
   /**
    * Question selection.
@@ -346,3 +346,5 @@ export function FeedbackJourney() {
     </div>
   )
 }
+
+import { personaById } from '@/data/active-reference'

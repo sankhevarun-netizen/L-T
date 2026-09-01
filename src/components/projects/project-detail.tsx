@@ -22,11 +22,12 @@ import { useProjectRollups } from '@/components/projects/projects-portfolio'
 import { BreakdownList, type BreakdownRow } from '@/components/shared/breakdown-list'
 import { MiniColumns } from '@/components/shared/mini-columns'
 import { bucketByMonth, pct } from '@/lib/analysis'
-import { CAMPAIGNS, PROJECTS, REPS } from '@/data/reference'
+
 import { useCrmStore } from '@/store/crm-store'
 import { formatCrore, formatDate, formatNumber, formatPercentValue } from '@/lib/format'
 import type { Booking, Lead } from '@/types'
 import { cn } from '@/lib/utils'
+import { useReference } from '@/data/use-reference'
 
 /** Validated ordinal ramp — single hue, monotone lightness. */
 const DEMAND_RAMP = [
@@ -37,6 +38,7 @@ const DEMAND_RAMP = [
 ]
 
 export function ProjectDetail({ projectId }: { projectId: string }) {
+  const { campaigns, projects, reps } = useReference()
   const router = useRouter()
   const leads = useCrmStore((s) => s.leads)
   const leadsById = useCrmStore((s) => s.leadsById)
@@ -45,7 +47,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const payments = useCrmStore((s) => s.payments)
   const serviceTickets = useCrmStore((s) => s.serviceTickets)
 
-  const project = PROJECTS.find((p) => p.id === projectId)
+  const project = projects.find((p) => p.id === projectId)
   const rollups = useProjectRollups()
   const rollup = rollups.find((r) => r.id === projectId)
   const rank = rollups.findIndex((r) => r.id === projectId) + 1
@@ -138,7 +140,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       .slice(0, 6)
       .map(([id, v]) => ({
         key: id,
-        label: CAMPAIGNS.find((c) => c.id === id)?.name ?? id,
+        label: campaigns.find((c) => c.id === id)?.name ?? id,
         caption: `${formatNumber(v.booked)} booked · ${formatPercentValue(pct(v.booked, v.leads), 1)} of its interest`,
         value: v.leads,
         display: formatNumber(v.leads),
@@ -271,7 +273,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       header: 'Owner',
       render: (b) => (
         <span className="whitespace-nowrap text-[12px] text-slate-500">
-          {REPS.find((r) => r.id === leadsById[b.leadId]?.ownerId)?.name ?? '—'}
+          {reps.find((r) => r.id === leadsById[b.leadId]?.ownerId)?.name ?? '—'}
         </span>
       ),
     },
@@ -346,7 +348,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       header: 'Owner',
       render: (l) => (
         <span className="whitespace-nowrap text-[12px] text-slate-500">
-          {REPS.find((r) => r.id === l.ownerId)?.name ?? '—'}
+          {reps.find((r) => r.id === l.ownerId)?.name ?? '—'}
         </span>
       ),
     },

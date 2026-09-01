@@ -21,7 +21,7 @@ import { EvidencePill, IntentPill, StagePill } from '@/components/shared/pills'
 import { TrendArrow } from '@/components/shared/delta'
 import { BreakdownList, type BreakdownRow } from '@/components/shared/breakdown-list'
 import { MiniColumns } from '@/components/shared/mini-columns'
-import { CAMPAIGNS, PROJECTS, REPS } from '@/data/reference'
+
 import { selectCampaignRows, selectFunnel } from '@/lib/selectors/overview'
 import { STALL_THRESHOLD_DAYS } from '@/lib/selectors/pipeline'
 import { bucketByMonth, pct } from '@/lib/analysis'
@@ -54,13 +54,14 @@ function shareOf<T>(items: T[], key: (item: T) => string, limit = 6) {
 }
 
 export function CampaignDetail({ campaignId }: { campaignId: string }) {
+  const { campaigns, projects, reps } = useReference()
   const router = useRouter()
   const leads = useCrmStore((s) => s.leads)
   const bookings = useCrmStore((s) => s.bookings)
   const siteVisits = useCrmStore((s) => s.siteVisits)
   const suppressed = useCrmStore((s) => s.suppressedCampaignIds)
 
-  const campaign = CAMPAIGNS.find((c) => c.id === campaignId)
+  const campaign = campaigns.find((c) => c.id === campaignId)
 
   const allRows = useMemo(() => selectCampaignRows(leads), [leads])
   const row = allRows.find((r) => r.id === campaignId)
@@ -90,7 +91,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     )
     return shareOf(
       expanded,
-      (p) => PROJECTS.find((x) => x.id === p.id)?.name ?? p.id,
+      (p) => projects.find((x) => x.id === p.id)?.name ?? p.id,
       5,
     )
   }, [campaignLeads])
@@ -104,7 +105,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     () =>
       shareOf(
         campaignLeads,
-        (l) => REPS.find((r) => r.id === l.ownerId)?.name ?? l.ownerId,
+        (l) => reps.find((r) => r.id === l.ownerId)?.name ?? l.ownerId,
         5,
       ),
     [campaignLeads],
@@ -301,7 +302,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
       header: 'Owner',
       render: (l) => (
         <span className="whitespace-nowrap text-[12px] text-slate-600">
-          {REPS.find((r) => r.id === l.ownerId)?.name ?? '—'}
+          {reps.find((r) => r.id === l.ownerId)?.name ?? '—'}
         </span>
       ),
     },
@@ -686,3 +687,5 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     </div>
   )
 }
+
+import { useReference } from '@/data/use-reference'
