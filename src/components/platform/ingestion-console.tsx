@@ -383,7 +383,7 @@ export function IngestionConsole() {
                           {formatNumber(source.pending)}
                         </span>
                         <span className="block text-[10px] uppercase tracking-wider text-slate-400">
-                          pending
+                          records
                         </span>
                       </span>
                     </button>
@@ -594,7 +594,7 @@ export function IngestionConsole() {
                 <Download />
                 {active?.pending
                   ? `Pull batch from ${active.label}`
-                  : 'Nothing pending on this source'}
+                  : 'No records left on this source'}
               </Button>
               {preview && (
                 <Button variant="outline" onClick={handleCommit}>
