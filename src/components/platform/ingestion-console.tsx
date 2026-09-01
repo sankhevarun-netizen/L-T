@@ -24,8 +24,10 @@ import {
   type PipelineRun,
 } from '@/lib/selectors/ingestion'
 import { formatNumber } from '@/lib/format'
-import { parseCsv, toObjects } from '@/lib/csv/parse-csv'
-import { planMerge, type MergePlan } from '@/lib/ingestion/merge-plan'
+import { Progress } from '@/components/ui/progress'
+import { yieldToPaint } from '@/lib/async'
+import { parseCsvAsync, toObjectsAsync } from '@/lib/csv/parse-csv'
+import { planMergeAsync, type MergePlan } from '@/lib/ingestion/merge-plan'
 import {
   detectType,
   RECORD_TYPES,
@@ -58,6 +60,15 @@ import { cn } from '@/lib/utils'
 
 const BATCH_SIZE = 1000
 
+/**
+ * How much of the commit bar validation owns.
+ *
+ * The remainder belongs to the store write, which is atomic and cannot report
+ * from inside itself — so the bar legitimately rests here while it lands rather
+ * than pretending to a granularity it does not have.
+ */
+const VALIDATE_SHARE = 90
+
 const idsOf = (rows: { id: string }[]) => new Set(rows.map((r) => r.id))
 
 interface ParsedFile {
@@ -73,7 +84,7 @@ interface ParsedFile {
 /** One union rather than a pile of booleans that can contradict each other. */
 type ImportPhase =
   | { step: 'idle' }
-  | { step: 'reading'; count: number }
+  | { step: 'working'; label: string; percent: number }
   | { step: 'review'; files: ParsedFile[] }
   | { step: 'done'; plan: MergePlan; label: string }
   | { step: 'error'; message: string }
@@ -124,12 +135,40 @@ export function IngestionConsole() {
     e.target.value = ''
     if (!picked.length) return
 
-    setImp({ step: 'reading', count: picked.length })
+    /*
+     * Progress is weighted by file size, not file count.
+     *
+     * A 9 MB export and a 40 KB reference set are one file each and nowhere
+     * near one unit of work each — counting files would park the bar at 50%
+     * for a minute and then finish instantly.
+     */
+    const totalBytes = picked.reduce((sum, f) => sum + f.size, 0) || 1
+    let doneBytes = 0
+
+    setImp({ step: 'working', label: `Reading ${picked.length} file(s)`, percent: 0 })
     try {
       const parsed: ParsedFile[] = []
 
       for (const file of picked) {
-        const table = parseCsv(await file.text())
+        const share = file.size / totalBytes
+        const report = (verb: string, fraction: number) =>
+          setImp({
+            step: 'working',
+            label: `${verb} ${file.name}`,
+            percent: Math.min(
+              99,
+              Math.round((doneBytes / totalBytes + share * fraction) * 100),
+            ),
+          })
+
+        report('Reading', 0)
+        const text = await file.text()
+
+        // Scanning dominates; turning rows into objects is the rest.
+        const table = await parseCsvAsync(text, {
+          onProgress: (p) => report('Parsing', 0.7 * (p.bytes / p.totalBytes)),
+        })
+
         if (!table.rows.length) {
           parsed.push({
             key: `${file.name}-empty`,
@@ -139,6 +178,7 @@ export function IngestionConsole() {
             type: null,
             warnings: ['no data rows'],
           })
+          doneBytes += file.size
           continue
         }
 
@@ -146,7 +186,9 @@ export function IngestionConsole() {
         if (table.truncated) warnings.push('file appears truncated')
         if (table.raggedRowCount) warnings.push(`${table.raggedRowCount} ragged row(s)`)
 
-        const objects = toObjects(table)
+        const objects = await toObjectsAsync(table, (done, total) =>
+          report('Indexing', 0.7 + 0.3 * (total ? done / total : 1)),
+        )
 
         /*
          * The combined export carries every type in one file, so it is split
@@ -173,6 +215,7 @@ export function IngestionConsole() {
               warnings,
             })
           }
+          doneBytes += file.size
           continue
         }
 
@@ -185,6 +228,7 @@ export function IngestionConsole() {
           type,
           warnings,
         })
+        doneBytes += file.size
       }
 
       setImp({ step: 'review', files: parsed })
@@ -215,8 +259,10 @@ export function IngestionConsole() {
   const readyTypes =
     imp.step === 'review' ? imp.files.filter((f) => f.type && f.rows.length) : []
   const readyRows = readyTypes.reduce((a, f) => a + f.rows.length, 0)
+  /* No second import while one is mid-flight — the two would interleave. */
+  const working = imp.step === 'working'
 
-  function handleImportCommit() {
+  async function handleImportCommit() {
     if (imp.step !== 'review') return
 
     const grouped: Partial<Record<RecordType, Record<string, string>[]>> = {}
@@ -225,40 +271,72 @@ export function IngestionConsole() {
       grouped[f.type] = [...(grouped[f.type] ?? []), ...f.rows]
     }
 
-    /*
-     * Existing ids for every type, not only the four that are foreign-key
-     * targets. The extra ones are not needed to resolve references, but they
-     * are what lets the plan report how many rows will REPLACE an existing
-     * record rather than add one — without them that figure reads zero and
-     * quietly understates what the import is about to do.
-     */
-    const plan = planMerge(grouped, {
-      leads: idsOf(storeLeads),
-      customers: idsOf(customers),
-      engagements: idsOf(engagements),
-      siteVisits: idsOf(siteVisits),
-      bookings: idsOf(bookings),
-      payments: idsOf(payments),
-      serviceTickets: idsOf(serviceTickets),
-      transcripts: idsOf(transcripts),
-      tasks: idsOf(tasks),
-      surveyInvites: idsOf(surveyInvites),
-      surveyResponses: idsOf(surveyResponses),
-      recoveryCases: idsOf(recoveryCases),
-    })
-
-    const records: Partial<Record<RecordType, { id: string }[]>> = {}
-    for (const t of plan.byType) {
-      if (t.accepted.length) records[t.type] = t.accepted
-    }
-
     const label = imp.files.map((f) => f.name).join(', ').slice(0, 80)
-    importRecords(records, {
-      batchId: `imp-${Date.now()}`,
-      label,
-      mode: replaceBook ? 'replace' : 'merge',
-    })
-    setImp({ step: 'done', plan, label })
+    setImp({ step: 'working', label: 'Validating records', percent: 0 })
+
+    try {
+      /*
+       * Existing ids for every type, not only the four that are foreign-key
+       * targets. The extra ones are not needed to resolve references, but they
+       * are what lets the plan report how many rows will REPLACE an existing
+       * record rather than add one — without them that figure reads zero and
+       * quietly understates what the import is about to do.
+       */
+      const plan = await planMergeAsync(
+        grouped,
+        {
+          leads: idsOf(storeLeads),
+          customers: idsOf(customers),
+          engagements: idsOf(engagements),
+          siteVisits: idsOf(siteVisits),
+          bookings: idsOf(bookings),
+          payments: idsOf(payments),
+          serviceTickets: idsOf(serviceTickets),
+          transcripts: idsOf(transcripts),
+          tasks: idsOf(tasks),
+          surveyInvites: idsOf(surveyInvites),
+          surveyResponses: idsOf(surveyResponses),
+          recoveryCases: idsOf(recoveryCases),
+        },
+        (p) => {
+          const fraction = p.rowsTotal ? p.rowsDone / p.rowsTotal : 1
+          setImp({
+            step: 'working',
+            label: `Validating ${SCHEMAS[p.type].label.toLowerCase()}`,
+            percent: Math.round(fraction * VALIDATE_SHARE),
+          })
+        },
+      )
+
+      const records: Partial<Record<RecordType, { id: string }[]>> = {}
+      for (const t of plan.byType) {
+        if (t.accepted.length) records[t.type] = t.accepted
+      }
+
+      /*
+       * The write itself is not sliced, and must not be: it happens inside one
+       * store update so that nothing ever renders against a half-merged book.
+       * It is also the cheapest step. One yield first, so this last label is
+       * actually painted before the thread is taken.
+       */
+      setImp({ step: 'working', label: 'Writing to the book', percent: VALIDATE_SHARE })
+      await yieldToPaint()
+
+      importRecords(records, {
+        batchId: `imp-${Date.now()}`,
+        label,
+        mode: replaceBook ? 'replace' : 'merge',
+      })
+      setImp({ step: 'done', plan, label })
+    } catch (error) {
+      setImp({
+        step: 'error',
+        message:
+          error instanceof Error
+            ? `Could not complete the import: ${error.message}`
+            : 'Could not complete the import.',
+      })
+    }
   }
 
   /*
@@ -416,7 +494,11 @@ export function IngestionConsole() {
             />
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => fileRef.current?.click()}>
+              <Button
+                variant="outline"
+                onClick={() => fileRef.current?.click()}
+                disabled={working}
+              >
                 <Upload />
                 Choose CSV files
               </Button>
@@ -429,16 +511,24 @@ export function IngestionConsole() {
                 </Button>
               )}
               {importedBatchIds.length > 0 && (
-                <Button variant="ghost" onClick={clearImportedData}>
+                <Button variant="ghost" onClick={clearImportedData} disabled={working}>
                   Clear imported data
                 </Button>
               )}
             </div>
 
-            {imp.step === 'reading' && (
-              <p className="mt-3 text-[12px] text-slate-500">
-                Reading {imp.count} file(s)…
-              </p>
+            {imp.step === 'working' && (
+              <div className="mt-3">
+                <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                  <p className="truncate text-[12px] font-medium text-slate-600">
+                    {imp.label}…
+                  </p>
+                  <span className="nums shrink-0 text-[12px] font-bold text-kpmg-blue">
+                    {imp.percent}%
+                  </span>
+                </div>
+                <Progress value={imp.percent} />
+              </div>
             )}
 
             {imp.step === 'error' && (

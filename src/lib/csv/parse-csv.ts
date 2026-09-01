@@ -13,6 +13,8 @@
  * available — so every case below is handled explicitly.
  */
 
+import { createSlicer } from '@/lib/async'
+
 export interface CsvTable {
   headers: string[]
   rows: string[][]
@@ -135,6 +137,138 @@ export function parseCsv(text: string, options: ParseCsvOptions = {}): CsvTable 
   if (inQuotes) truncated = true
   if (field !== '' || row.length) endRow()
 
+  return finalise(records, truncated, delimiter)
+}
+
+export interface ParseProgress {
+  /** Characters consumed, against the length of the whole file. */
+  bytes: number
+  totalBytes: number
+  /** Rows closed so far, header included. */
+  rows: number
+}
+
+export interface ParseCsvAsyncOptions extends ParseCsvOptions {
+  onProgress?: (progress: ParseProgress) => void
+}
+
+/**
+ * The same scanner, yielding to the browser as it goes.
+ *
+ * The character loop below is the sync one above, unchanged — deliberately so.
+ * Every rule that file-level comment defends is load-bearing on real exports,
+ * and a reimplementation that drifted by one case would return silently wrong
+ * data. What differs is only the bounds: an outer driver runs the loop until a
+ * frame's budget is spent, reports where it is, and hands the thread back.
+ *
+ * The split is safe at any iteration boundary because both lookahead cases —
+ * a doubled quote and a CRLF pair — consume their second character with `i += 1`
+ * *before* control returns to the top of the loop. So the cursor is never left
+ * pointing between two characters that belong together.
+ */
+export async function parseCsvAsync(
+  text: string,
+  options: ParseCsvAsyncOptions = {},
+): Promise<CsvTable> {
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+  const delimiter = options.delimiter ?? sniffDelimiter(source)
+  const maxRows = options.maxRows ?? DEFAULT_MAX_ROWS
+  const { onProgress } = options
+
+  const records: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let inQuotes = false
+  let quoted = false
+  let truncated = false
+
+  const endField = () => {
+    row.push(quoted ? field : field.trim())
+    field = ''
+    quoted = false
+  }
+  const endRow = () => {
+    endField()
+    if (row.length > 1 || row[0] !== '') records.push(row)
+    row = []
+  }
+
+  const slicer = createSlicer()
+  let i = 0
+
+  while (i < source.length) {
+    if (slicer.expired()) {
+      onProgress?.({ bytes: i, totalBytes: source.length, rows: records.length })
+      await slicer.next()
+    }
+
+    const ch = source[i]
+
+    if (inQuotes) {
+      if (ch === '"') {
+        if (source[i + 1] === '"') {
+          field += '"'
+          i += 1
+        } else {
+          inQuotes = false
+        }
+      } else {
+        field += ch
+      }
+      i += 1
+      continue
+    }
+
+    if (ch === '"' && field === '') {
+      inQuotes = true
+      quoted = true
+    } else if (ch === delimiter) {
+      endField()
+    } else if (ch === '\n') {
+      endRow()
+      if (records.length > maxRows) {
+        truncated = true
+        i += 1
+        break
+      }
+    } else if (ch === '\r') {
+      if (source[i + 1] === '\n') i += 1
+      endRow()
+      if (records.length > maxRows) {
+        truncated = true
+        i += 1
+        break
+      }
+    } else {
+      field += ch
+    }
+
+    i += 1
+  }
+
+  if (inQuotes) truncated = true
+  if (field !== '' || row.length) endRow()
+
+  onProgress?.({
+    bytes: source.length,
+    totalBytes: source.length,
+    rows: records.length,
+  })
+
+  return finalise(records, truncated, delimiter)
+}
+
+/**
+ * Header extraction and row squaring, shared by both scanners.
+ *
+ * Pulled out rather than duplicated: the ragged-row count is reported to the
+ * user, and two copies of this could disagree about what "ragged" meant.
+ */
+function finalise(
+  records: string[][],
+  truncated: boolean,
+  delimiter: string,
+): CsvTable {
   const headers = dedupeHeaders(records.shift() ?? [])
   const width = headers.length
 
@@ -142,8 +276,6 @@ export function parseCsv(text: string, options: ParseCsvOptions = {}): CsvTable 
   const rows = records.map((record) => {
     if (record.length === width) return record
     raggedRowCount += 1
-    // Pad short rows and drop extras, so every row is addressable by column
-    // index. Counted either way — silently reshaping data is not acceptable.
     return record.length < width
       ? [...record, ...Array<string>(width - record.length).fill('')]
       : record.slice(0, width)
@@ -165,11 +297,38 @@ function dedupeHeaders(headers: string[]): string[] {
 
 /** Rows as objects keyed by header — the shape every caller actually wants. */
 export function toObjects(table: CsvTable): Record<string, string>[] {
-  return table.rows.map((row) => {
-    const out: Record<string, string> = {}
-    table.headers.forEach((h, i) => {
-      out[h] = row[i] ?? ''
-    })
-    return out
+  return table.rows.map((row) => toObject(table.headers, row))
+}
+
+function toObject(headers: string[], row: string[]): Record<string, string> {
+  const out: Record<string, string> = {}
+  headers.forEach((h, i) => {
+    out[h] = row[i] ?? ''
   })
+  return out
+}
+
+/**
+ * The same conversion, yielding between slices.
+ *
+ * Cheaper per row than the scan, but 115 columns across 39,000 rows is four
+ * and a half million property writes — enough to hold the frame on its own.
+ */
+export async function toObjectsAsync(
+  table: CsvTable,
+  onProgress?: (done: number, total: number) => void,
+): Promise<Record<string, string>[]> {
+  const out: Record<string, string>[] = []
+  const slicer = createSlicer()
+
+  for (let i = 0; i < table.rows.length; i += 1) {
+    if (slicer.expired()) {
+      onProgress?.(i, table.rows.length)
+      await slicer.next()
+    }
+    out.push(toObject(table.headers, table.rows[i]))
+  }
+
+  onProgress?.(table.rows.length, table.rows.length)
+  return out
 }
