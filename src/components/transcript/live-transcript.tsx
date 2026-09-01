@@ -102,7 +102,26 @@ export function LiveTranscript() {
     if (el) el.scrollTop = el.scrollHeight
   }, [player.revealed.length])
 
-  if (!transcript) return null
+  /*
+   * Transcripts are the one record type the seeded book supplies entirely from
+   * the authored set, so a replace-import that carried no transcripts CSV
+   * empties this screen. Legitimate — but it has to say so, not render nothing.
+   */
+  if (!transcript) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center">
+          <p className="text-[13px] font-semibold text-slate-700">
+            No call recordings in this book
+          </p>
+          <p className="mt-1 text-[12px] text-slate-500">
+            Import a transcripts file to replay a call here, or reset to the
+            example data.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const { lead, analysis } = player
 

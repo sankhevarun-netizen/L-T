@@ -64,12 +64,47 @@ const CHANNEL_COPY: Record<SurveyChannel, { label: string; guidance: string }> =
 
 export function FeedbackJourney() {
   const leads = useCrmStore((s) => s.leads)
+  const engagements = useCrmStore((s) => s.engagements)
 
-  /* The authored profiles are the ones with a full journey to compose against. */
-  const authored = useMemo(
-    () => leads.filter((l) => l.featured).slice(0, 6),
-    [leads],
-  )
+  /*
+   * Six customers with enough journey behind them to compose a survey against.
+   *
+   * This filtered on `featured`, which is curation rather than data: only the
+   * nine hand-authored profiles in src/data/featured.ts carry it and every
+   * generated lead is explicitly false. An imported book therefore produced an
+   * empty list, which left the select with no options and blanked the entire
+   * page at the `!lead` guard below — the header rendered from the layout, so
+   * it read as half-loaded rather than broken.
+   *
+   * Ranked instead. Authored profiles still sort to the front when the book has
+   * them, so the walkthrough is unchanged, and the remaining slots come from
+   * whatever book is loaded: conversation history first, because the persona
+   * match and the composed questions are both read off it, then journey depth,
+   * then score.
+   */
+  const authored = useMemo(() => {
+    const conversations = new Map<string, number>()
+    for (const e of engagements) {
+      conversations.set(e.leadId, (conversations.get(e.leadId) ?? 0) + 1)
+    }
+
+    // Ranked once per lead rather than inside the comparator, which would
+    // recompute the stage lookup on every comparison.
+    const ranked = leads
+      .filter((l) => !l.dnd)
+      .map((l) => ({
+        lead: l,
+        rank:
+          (l.featured ? 10_000 : 0) +
+          Math.min(conversations.get(l.id) ?? 0, 10) * 30 +
+          STAGE_ORDER.indexOf(l.stage) * 25 +
+          l.score,
+      }))
+
+    // A stable sort, so leads of equal rank keep the book's own order.
+    ranked.sort((a, b) => b.rank - a.rank)
+    return ranked.slice(0, 6).map((r) => r.lead)
+  }, [leads, engagements])
 
   const [leadId, setLeadId] = useState(authored[0]?.id ?? '')
 
@@ -116,7 +151,25 @@ export function FeedbackJourney() {
     [lead, touchpoint, assignment],
   )
 
-  if (!lead) return null
+  /*
+   * Only reachable now for a book with no contactable leads at all. Says so,
+   * rather than rendering nothing — a blank page reads as a failed deploy.
+   */
+  if (!lead) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center">
+          <p className="text-[13px] font-semibold text-slate-700">
+            No customer to compose against
+          </p>
+          <p className="mt-1 text-[12px] text-slate-500">
+            The loaded book has no contactable leads. Import a book with leads,
+            or reset to the example data.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const stageIndex = STAGE_ORDER.indexOf(lead.stage)
 
@@ -131,7 +184,7 @@ export function FeedbackJourney() {
           <CardContent className="pb-4">
             <select
               aria-label="Customer"
-              value={leadId}
+              value={lead.id}
               onChange={(e) => setLeadId(e.target.value)}
               className="mb-3 h-8 w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2 text-[12.5px] font-medium text-slate-700 outline-none focus-visible:ring-2 focus-visible:ring-kpmg-blue/30"
             >
