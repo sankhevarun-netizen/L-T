@@ -24,6 +24,14 @@ import {
   type PipelineRun,
 } from '@/lib/selectors/ingestion'
 import { formatNumber } from '@/lib/format'
+import { parseCsv, toObjects } from '@/lib/csv/parse-csv'
+import { planMerge, type MergePlan } from '@/lib/ingestion/merge-plan'
+import {
+  detectType,
+  RECORD_TYPES,
+  SCHEMAS,
+  type RecordType,
+} from '@/lib/ingestion/schemas'
 import { salesforceCrm } from '@/lib/crm/salesforce-crm'
 import { useCrmStore } from '@/store/crm-store'
 import { cn } from '@/lib/utils'
@@ -31,9 +39,15 @@ import { cn } from '@/lib/utils'
 /**
  * Data ingestion console.
  *
- * Demonstration only — nothing streams in real time. It pulls a batch from the
- * seeded book and runs it through the same EAI and sanitization steps the
- * architecture page draws, so the pipeline is operable rather than illustrative.
+ * Two ways in. The source list pulls a batch from the book already loaded and
+ * runs it through the EAI and sanitization steps the architecture page draws.
+ * The file import reads real CSVs, detects what each one is from its headers,
+ * validates and deduplicates them, and merges the survivors into the book —
+ * where every other screen then reads them.
+ *
+ * Nothing streams in real time and there is no server: an import is parsed in
+ * the browser and kept in this browser. Records are keyed on id, so importing
+ * the same file twice replaces those rows rather than duplicating them.
  *
  * The funnel is computed before anything is committed and has to reconcile:
  * received = duplicates + rejected + written. Only the survivors are ingested,
@@ -42,50 +56,196 @@ import { cn } from '@/lib/utils'
 
 const BATCH_SIZE = 1000
 
+const idsOf = (rows: { id: string }[]) => new Set(rows.map((r) => r.id))
+
+interface ParsedFile {
+  key: string
+  name: string
+  headers: string[]
+  rows: Record<string, string>[]
+  /** Detected from the headers, or set by the user. Null means unrecognised. */
+  type: RecordType | null
+  warnings: string[]
+}
+
+/** One union rather than a pile of booleans that can contradict each other. */
+type ImportPhase =
+  | { step: 'idle' }
+  | { step: 'reading'; count: number }
+  | { step: 'review'; files: ParsedFile[] }
+  | { step: 'done'; plan: MergePlan; label: string }
+  | { step: 'error'; message: string }
+
 export function IngestionConsole() {
   const leads = useCrmStore((s) => s.leads)
   const engagements = useCrmStore((s) => s.engagements)
   const ingestedLeadIds = useCrmStore((s) => s.ingestedLeadIds)
+  const storeLeads = leads
+  const customers = useCrmStore((s) => s.customers)
+  const siteVisits = useCrmStore((s) => s.siteVisits)
+  const bookings = useCrmStore((s) => s.bookings)
+  const payments = useCrmStore((s) => s.payments)
+  const serviceTickets = useCrmStore((s) => s.serviceTickets)
+  const transcripts = useCrmStore((s) => s.transcripts)
+  const tasks = useCrmStore((s) => s.tasks)
+  const surveyInvites = useCrmStore((s) => s.surveyInvites)
+  const surveyResponses = useCrmStore((s) => s.surveyResponses)
+  const recoveryCases = useCrmStore((s) => s.recoveryCases)
+  const importedBatchIds = useCrmStore((s) => s.importedBatchIds)
+  const importRecords = useCrmStore((s) => s.importRecords)
+  const clearImportedData = useCrmStore((s) => s.clearImportedData)
 
   const [sourceId, setSourceId] = useState<IngestionSourceId>('salesforce')
   const [preview, setPreview] = useState<PipelineRun | null>(null)
   const [committed, setCommitted] = useState<number | null>(null)
 
   /*
-   * The upload control.
+   * The CSV import.
    *
-   * The file is genuinely read — name, size, row count and column headers all
-   * come from what the user picked, so the panel responds to their data rather
-   * than playing a canned animation. Nothing is merged: no lead is created and
-   * the store is never touched. The result panel says so in as many words,
-   * because a control this convincing has to be unambiguous about what it did
-   * not do.
+   * Files are read in the browser, their type detected from the headers rather
+   * than the filename, and the whole set planned before anything is written —
+   * the same propose-then-commit shape every agent in this build follows.
    */
   const fileRef = useRef<HTMLInputElement>(null)
-  const [upload, setUpload] = useState<{
-    name: string
-    sizeKb: number
-    rows: number
-    columns: string[]
-  } | null>(null)
+  const [imp, setImp] = useState<ImportPhase>({ step: 'idle' })
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = String(reader.result ?? '')
-      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0)
-      const header = lines[0]?.split(',').map((h) => h.trim().replace(/^"|"$/g, '')) ?? []
-      setUpload({
-        name: file.name,
-        sizeKb: Math.max(1, Math.round(file.size / 1024)),
-        // First line is the header, so the body is what would be ingested.
-        rows: Math.max(0, lines.length - 1),
-        columns: header.slice(0, 8),
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = [...(e.target.files ?? [])]
+    // Reset the input so choosing the same file twice still fires a change.
+    e.target.value = ''
+    if (!picked.length) return
+
+    setImp({ step: 'reading', count: picked.length })
+    try {
+      const parsed: ParsedFile[] = []
+
+      for (const file of picked) {
+        const table = parseCsv(await file.text())
+        if (!table.rows.length) {
+          parsed.push({
+            key: `${file.name}-empty`,
+            name: file.name,
+            headers: table.headers,
+            rows: [],
+            type: null,
+            warnings: ['no data rows'],
+          })
+          continue
+        }
+
+        const warnings: string[] = []
+        if (table.truncated) warnings.push('file appears truncated')
+        if (table.raggedRowCount) warnings.push(`${table.raggedRowCount} ragged row(s)`)
+
+        const objects = toObjects(table)
+
+        /*
+         * The combined export carries every type in one file, so it is split
+         * here by its own recordType column. A per-entity file is identified by
+         * its header signature instead.
+         */
+        if (table.headers.includes('recordType')) {
+          const groups = new Map<string, Record<string, string>[]>()
+          for (const row of objects) {
+            const t = row.recordType
+            if (!t) continue
+            const bucket = groups.get(t) ?? []
+            bucket.push(row)
+            groups.set(t, bucket)
+          }
+          for (const [t, rows] of groups) {
+            const known = (RECORD_TYPES as string[]).includes(t)
+            parsed.push({
+              key: `${file.name}-${t}`,
+              name: `${file.name} → ${known ? SCHEMAS[t as RecordType].label : t}`,
+              headers: table.headers,
+              rows,
+              type: known ? (t as RecordType) : null,
+              warnings,
+            })
+          }
+          continue
+        }
+
+        const { type } = detectType(table.headers)
+        parsed.push({
+          key: file.name,
+          name: file.name,
+          headers: table.headers,
+          rows: objects,
+          type,
+          warnings,
+        })
+      }
+
+      setImp({ step: 'review', files: parsed })
+    } catch (error) {
+      setImp({
+        step: 'error',
+        message:
+          error instanceof Error
+            ? `Could not read the file: ${error.message}`
+            : 'Could not read the file.',
       })
     }
-    reader.readAsText(file)
+  }
+
+  function setFileType(key: string, type: RecordType | '') {
+    setImp((prev) =>
+      prev.step === 'review'
+        ? {
+            ...prev,
+            files: prev.files.map((f) =>
+              f.key === key ? { ...f, type: type === '' ? null : type } : f,
+            ),
+          }
+        : prev,
+    )
+  }
+
+  const readyTypes =
+    imp.step === 'review' ? imp.files.filter((f) => f.type && f.rows.length) : []
+  const readyRows = readyTypes.reduce((a, f) => a + f.rows.length, 0)
+
+  function handleImportCommit() {
+    if (imp.step !== 'review') return
+
+    const grouped: Partial<Record<RecordType, Record<string, string>[]>> = {}
+    for (const f of imp.files) {
+      if (!f.type || !f.rows.length) continue
+      grouped[f.type] = [...(grouped[f.type] ?? []), ...f.rows]
+    }
+
+    /*
+     * Existing ids for every type, not only the four that are foreign-key
+     * targets. The extra ones are not needed to resolve references, but they
+     * are what lets the plan report how many rows will REPLACE an existing
+     * record rather than add one — without them that figure reads zero and
+     * quietly understates what the import is about to do.
+     */
+    const plan = planMerge(grouped, {
+      leads: idsOf(storeLeads),
+      customers: idsOf(customers),
+      engagements: idsOf(engagements),
+      siteVisits: idsOf(siteVisits),
+      bookings: idsOf(bookings),
+      payments: idsOf(payments),
+      serviceTickets: idsOf(serviceTickets),
+      transcripts: idsOf(transcripts),
+      tasks: idsOf(tasks),
+      surveyInvites: idsOf(surveyInvites),
+      surveyResponses: idsOf(surveyResponses),
+      recoveryCases: idsOf(recoveryCases),
+    })
+
+    const records: Partial<Record<RecordType, { id: string }[]>> = {}
+    for (const t of plan.byType) {
+      if (t.accepted.length) records[t.type] = t.accepted
+    }
+
+    const label = imp.files.map((f) => f.name).join(', ').slice(0, 80)
+    importRecords(records, { batchId: `imp-${Date.now()}`, label })
+    setImp({ step: 'done', plan, label })
   }
 
   const sources = useMemo(
@@ -198,70 +358,134 @@ export function IngestionConsole() {
           </CardContent>
         </Card>
 
-        {/* Bring your own file — visible, and honest about being a demonstration */}
-      <Card className="lg:col-start-1">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-1.5">
-            <Upload className="size-4 text-kpmg-blue" />
-            Import a file
-          </CardTitle>
-          <span className="text-[10.5px] font-medium text-slate-400">
-            CSV · demonstration
-          </span>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={handleFile}
-            className="hidden"
-          />
-          <Button variant="outline" onClick={() => fileRef.current?.click()}>
-            <Upload />
-            Choose a CSV file
-          </Button>
+        {/* Bring your own files — parsed, validated and merged into the book */}
+        <Card className="lg:col-start-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-1.5">
+              <Upload className="size-4 text-kpmg-blue" />
+              Import CSV files
+            </CardTitle>
+            <span className="text-[10.5px] font-medium text-slate-400">
+              {importedBatchIds.length ? `${importedBatchIds.length} import(s) merged` : 'Up to 12 at once'}
+            </span>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              multiple
+              onChange={handleFiles}
+              className="hidden"
+            />
 
-          {upload && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                Validated &mdash; not merged
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={() => fileRef.current?.click()}>
+                <Upload />
+                Choose CSV files
+              </Button>
+              {imp.step === 'review' && (
+                <Button onClick={handleImportCommit} disabled={!readyTypes.length}>
+                  <ShieldCheck />
+                  {readyTypes.length
+                    ? `Merge ${formatNumber(readyRows)} record(s)`
+                    : 'No recognised files'}
+                </Button>
+              )}
+              {importedBatchIds.length > 0 && (
+                <Button variant="ghost" onClick={clearImportedData}>
+                  Clear imported data
+                </Button>
+              )}
+            </div>
+
+            {imp.step === 'reading' && (
+              <p className="mt-3 text-[12px] text-slate-500">
+                Reading {imp.count} file(s)…
               </p>
-              <p className="nums mt-1.5 text-[12.5px] font-semibold text-slate-800">
-                {upload.name}
+            )}
+
+            {imp.step === 'error' && (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-[12px] text-amber-800">
+                {imp.message}
               </p>
-              <p className="nums mt-0.5 text-[11.5px] text-slate-500">
-                {formatNumber(upload.rows)} row(s) · {formatNumber(upload.sizeKb)} KB ·{' '}
-                {upload.columns.length} column(s) detected
-              </p>
-              {upload.columns.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {upload.columns.map((c) => (
-                    <span
-                      key={c}
-                      className="rounded-full bg-white px-2 py-0.5 text-[10.5px] font-medium text-slate-600 ring-1 ring-slate-200"
-                    >
-                      {c}
+            )}
+
+            {imp.step === 'review' && (
+              <div className="mt-3 space-y-1.5">
+                {imp.files.map((f) => (
+                  <div
+                    key={f.key}
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[12px] font-semibold text-slate-800">
+                        {f.name}
+                      </span>
+                      <span className="nums block text-[11px] text-slate-500">
+                        {formatNumber(f.rows.length)} row(s) · {f.headers.length} column(s)
+                        {f.warnings.length ? ` · ${f.warnings.join(' · ')}` : ''}
+                      </span>
                     </span>
+                    {/*
+                      Detected from the headers, not the filename — a renamed
+                      file must still import. The override exists because a
+                      confident guess is still a guess.
+                    */}
+                    <select
+                      value={f.type ?? ''}
+                      onChange={(e) => setFileType(f.key, e.target.value as RecordType | '')}
+                      className="shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11.5px] text-slate-700"
+                    >
+                      <option value="">— not recognised —</option>
+                      {RECORD_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {SCHEMAS[t].label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {imp.step === 'done' && (
+              <div className="mt-3 rounded-lg border border-kpmg-teal/25 bg-kpmg-teal/[0.05] p-3">
+                <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-kpmg-teal">
+                  <CircleCheck className="size-3" strokeWidth={2.6} />
+                  Merged into the book
+                </p>
+                <div className="mt-2 space-y-0.5">
+                  {imp.plan.byType.map((t) => (
+                    <p key={t.type} className="nums text-[11.5px] text-slate-600">
+                      {SCHEMAS[t.type].label}: {formatNumber(t.accepted.length)} written
+                      {t.replacing > 0 ? `, ${formatNumber(t.replacing)} replaced` : ''}
+                      {t.rejected > 0 ? `, ${formatNumber(t.rejected)} rejected` : ''}
+                      {t.reasons.length
+                        ? ` — ${t.reasons.map((r) => `${r.reason} (${formatNumber(r.count)})`).join(' · ')}`
+                        : ''}
+                    </p>
                   ))}
                 </div>
-              )}
-              <p className="mt-2.5 text-[11.5px] leading-relaxed text-slate-600">
-                This is a demonstration environment. The file was read to show
-                what an import would carry — nothing has been written, no lead
-                was created, and the figures on every other screen are unchanged.
-              </p>
-            </div>
-          )}
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                  Records are keyed on id, so re-importing the same file replaces
+                  those rows rather than adding a second copy. Imported data is
+                  held in this browser and is removed by Clear or by Reset.
+                </p>
+              </div>
+            )}
 
-          {!upload && (
-            <p className="mt-2.5 text-[11.5px] leading-relaxed text-slate-500">
-              Shows what a customer file would bring in. Records are read and
-              reported, never merged into the demonstration book.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            {imp.step === 'idle' && (
+              <p className="mt-2.5 text-[11.5px] leading-relaxed text-slate-500">
+                Select one file or many — the type of each is detected from its
+                headers, so the order does not matter. Records are validated,
+                deduplicated and merged into the book, and show up on every
+                screen. Contact details are stored as given in this browser; they
+                are not masked, and Clear is the only way to remove them.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
       {/* Pipeline */}
         <Card className="flex min-w-0 flex-col">
@@ -301,58 +525,7 @@ export function IngestionConsole() {
               </div>
             )}
 
-            {preview && (
-              <>
-                <ol className="mt-3 space-y-2">
-                  <Stage
-                    icon={Download}
-                    label="Received via EAI"
-                    value={preview.received}
-                    note="Connectors, event routing, rate and retry handling"
-                  />
-                  <Stage
-                    icon={Copy}
-                    label="De-duplication"
-                    value={preview.duplicates}
-                    note="Colliding phone or email against records already seen"
-                    tone="amber"
-                  />
-                  <Stage
-                    icon={ShieldCheck}
-                    label="PII masked"
-                    value={preview.piiFieldsMasked}
-                    note="Phone and email values masked on the way in"
-                  />
-                  <Stage
-                    icon={TriangleAlert}
-                    label="Validation rejected"
-                    value={preview.rejected}
-                    note={
-                      preview.rejectionReasons.length
-                        ? preview.rejectionReasons
-                            .map((r) => `${r.reason} (${formatNumber(r.count)})`)
-                            .join(' · ')
-                        : 'Every record passed the validation rules'
-                    }
-                    tone="amber"
-                  />
-                  <Stage
-                    icon={CircleCheck}
-                    label="Written to CRM"
-                    value={preview.written}
-                    note="Cleaned records landing in Salesforce as native objects"
-                    tone="teal"
-                  />
-                </ol>
-
-                <p className="nums mt-2.5 text-[11px] text-slate-400">
-                  {formatNumber(preview.received)} received ={' '}
-                  {formatNumber(preview.duplicates)} duplicates +{' '}
-                  {formatNumber(preview.rejected)} rejected +{' '}
-                  {formatNumber(preview.written)} written
-                </p>
-              </>
-            )}
+            {preview && <PipelineFunnel run={preview} />}
 
             {!preview && committed === null && (
               <p className="mt-3 text-[12px] leading-relaxed text-slate-500">
@@ -379,6 +552,68 @@ export function IngestionConsole() {
         </Card>
       </div>
     </div>
+  )
+}
+
+/**
+ * The EAI -> sanitization -> CRM funnel.
+ *
+ * Extracted so the source-pull path and the CSV path render the same thing.
+ * Two copies would drift, and the reconciliation line below — the one that
+ * proves nothing was lost between stages — has to live in exactly one place.
+ */
+function PipelineFunnel({ run }: { run: PipelineRun }) {
+  return (
+    <>
+                            <ol className="mt-3 space-y-2">
+                  <Stage
+                    icon={Download}
+                    label="Received via EAI"
+                    value={run.received}
+                    note="Connectors, event routing, rate and retry handling"
+                  />
+                  <Stage
+                    icon={Copy}
+                    label="De-duplication"
+                    value={run.duplicates}
+                    note="Colliding phone or email against records already seen"
+                    tone="amber"
+                  />
+                  <Stage
+                    icon={ShieldCheck}
+                    label="PII masked"
+                    value={run.piiFieldsMasked}
+                    note="Phone and email values masked on the way in"
+                  />
+                  <Stage
+                    icon={TriangleAlert}
+                    label="Validation rejected"
+                    value={run.rejected}
+                    note={
+                      run.rejectionReasons.length
+                        ? run.rejectionReasons
+                            .map((r) => `${r.reason} (${formatNumber(r.count)})`)
+                            .join(' · ')
+                        : 'Every record passed the validation rules'
+                    }
+                    tone="amber"
+                  />
+                  <Stage
+                    icon={CircleCheck}
+                    label="Written to CRM"
+                    value={run.written}
+                    note="Cleaned records landing in Salesforce as native objects"
+                    tone="teal"
+                  />
+                </ol>
+
+                <p className="nums mt-2.5 text-[11px] text-slate-400">
+                  {formatNumber(run.received)} received ={' '}
+                  {formatNumber(run.duplicates)} duplicates +{' '}
+                  {formatNumber(run.rejected)} rejected +{' '}
+                  {formatNumber(run.written)} written
+                </p>
+    </>
   )
 }
 

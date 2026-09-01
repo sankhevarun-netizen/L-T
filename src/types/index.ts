@@ -132,6 +132,8 @@ export interface Lead {
 
   createdAt: string
   lastActivityAt: string
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface Customer {
@@ -149,6 +151,8 @@ export interface Customer {
   occupation: string
   /** Set for the NRI persona — drives the Virtual Selling Assistant scenario. */
   isNri: boolean
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface Persona {
@@ -199,6 +203,8 @@ export interface Engagement {
   /** Minutes, for calls. */
   durationMins?: number
   occurredAt: string
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface SiteVisit {
@@ -211,6 +217,8 @@ export interface SiteVisit {
   feedback?: string
   objection?: string
   outcome?: 'booked' | 'considering' | 'dropped' | 'pending'
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface Booking {
@@ -222,6 +230,8 @@ export interface Booking {
   valueCr: number
   bookedAt: string
   closedWon: boolean
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface Payment {
@@ -233,6 +243,8 @@ export interface Payment {
   dueAt: string
   paidAt?: string
   status: 'paid' | 'due' | 'overdue'
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface ServiceTicket {
@@ -247,6 +259,8 @@ export interface ServiceTicket {
   resolvedAt?: string
   status: 'open' | 'in-progress' | 'resolved'
   detail: string
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface Campaign {
@@ -281,6 +295,8 @@ export interface Transcript {
   repName: string
   recordedAt: string
   lines: TranscriptLine[]
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface AgentAction {
@@ -338,6 +354,8 @@ export interface SfTask {
   status: 'Open' | 'Completed'
   createdBy: 'DICE' | 'Agentforce' | 'Rep'
   createdAt: string
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface SfActivity {
@@ -450,6 +468,8 @@ export interface SurveyInvite {
   /** Signals behind the propensity score, shown as evidence. */
   signals: string[]
   featured?: boolean
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 export interface SurveyResponse {
@@ -474,6 +494,8 @@ export interface SurveyResponse {
   /** Ticket that preceded this response, when one did — see the recovery chain. */
   sourceTicketId?: string
   featured?: boolean
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 /** One theme extracted from open text, with the spans that justified it. */
@@ -537,6 +559,8 @@ export interface RecoveryCase {
   closureEvidence?: string
   /** Set when the detractor signal originated in an SLA-breached ticket. */
   sourceTicketId?: string
+  /** Set when this record arrived through a CSV import; names the batch. */
+  importedBatchId?: string
 }
 
 /** Governed question library backing the Dynamic Feedback Journey composer. */

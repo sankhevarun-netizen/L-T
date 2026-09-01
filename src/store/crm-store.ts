@@ -23,6 +23,14 @@ import type {
   Transcript,
 } from '@/types'
 import { TOUCHPOINT_LABEL } from '@/types'
+import type { RecordType } from '@/lib/ingestion/schemas'
+import { mergeOrder } from '@/lib/ingestion/schemas'
+import {
+  clearImports,
+  readImports,
+  writeImports,
+  type ImportPayload,
+} from '@/lib/ingestion/import-storage'
 
 /**
  * The in-memory Salesforce stand-in.
@@ -41,6 +49,37 @@ let recoverySeq = 0
 
 function nextId(prefix: string, seq: number) {
   return `${prefix}-${String(seq).padStart(5, '0')}`
+}
+
+/** The collections a CSV import can write. Store keys match RecordType names. */
+const IMPORTABLE_TYPES: RecordType[] = [
+  'leads', 'customers', 'engagements', 'siteVisits', 'bookings', 'payments',
+  'serviceTickets', 'transcripts', 'tasks', 'surveyInvites', 'surveyResponses',
+  'recoveryCases',
+]
+
+/**
+ * Write the imported slice of state to disk.
+ *
+ * Only records carrying a batch id are stored — the seeded book is regenerated
+ * on every load and storing it too would waste the quota on data that is
+ * already free.
+ */
+function persistImports(state: CrmState) {
+  const records: Partial<Record<RecordType, unknown[]>> = {}
+  for (const type of IMPORTABLE_TYPES) {
+    const rows = state[type as keyof CrmState] as { importedBatchId?: string }[]
+    if (!Array.isArray(rows)) continue
+    const mine = rows.filter((r) => r.importedBatchId)
+    if (mine.length) records[type] = mine
+  }
+  const payload: ImportPayload = {
+    version: 1,
+    batchIds: state.importedBatchIds,
+    savedAt: new Date().toISOString(),
+    records,
+  }
+  return writeImports(payload)
 }
 
 export interface CrmState {
@@ -63,6 +102,8 @@ export interface CrmState {
   suppressedCampaignIds: string[]
   /** Leads whose interaction history has been ingested and sanitised. */
   ingestedLeadIds: string[]
+  /** Batches of imported CSV data currently merged into the book. */
+  importedBatchIds: string[]
 
   /* ---- writes ---- */
   updateLead: (
@@ -91,6 +132,15 @@ export interface CrmState {
   upsertContact: (customer: Customer) => void
   suppressCampaign: (campaignId: string, reason: string) => void
   ingestSanitizedData: (leadIds: string[]) => void
+  /** Merge parsed CSV records into the book, upserting on id. */
+  importRecords: (
+    records: Partial<Record<RecordType, { id: string }[]>>,
+    meta: { batchId: string; label: string },
+  ) => void
+  /** Drop everything a CSV import brought in, in memory and on disk. */
+  clearImportedData: () => void
+  /** Restore a previous import after a reload. Effect-only — never in render. */
+  rehydrateImports: () => Promise<void>
 
   /* ---- feedback writes ---- */
   createRecoveryCase: (input: {
@@ -228,6 +278,7 @@ function seedState(source: 'example' | 'client' = 'example') {
     suppressedCampaignIds: [] as string[],
     // Only leads whose history has been ingested can be reasoned over.
     ingestedLeadIds: data.leads.filter((l) => l.ingested).map((l) => l.id),
+    importedBatchIds: [] as string[],
   }
 }
 
@@ -414,6 +465,102 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         ],
       }
     }),
+
+  /*
+   * Merge imported records into the book.
+   *
+   * Upsert on id, not append. Every exported row carries the id it left with,
+   * so re-importing the platform's own export must replace those records rather
+   * than add a second copy of each — otherwise the first upload doubles all
+   * 28,327 rows and every figure on every screen with it. This one decision is
+   * what makes the round-trip idempotent.
+   *
+   * Types are merged in dependency order so a row's foreign key resolves
+   * against records that are already present.
+   */
+  importRecords: (records, meta) =>
+    set((state) => {
+      const next = { ...state } as Record<string, unknown>
+      const stamped = { importedBatchId: meta.batchId }
+      let written = 0
+
+      for (const type of mergeOrder(Object.keys(records) as RecordType[])) {
+        const incoming = records[type]
+        if (!incoming?.length) continue
+
+        // Map preserves insertion order, so existing records keep their
+        // position and genuinely new ones land at the end.
+        const merged = new Map<string, unknown>()
+        for (const row of (state[type as keyof CrmState] as { id: string }[]) ?? []) {
+          merged.set(row.id, row)
+        }
+        for (const row of incoming) {
+          merged.set(row.id, { ...row, ...stamped })
+          written += 1
+        }
+        next[type] = [...merged.values()]
+      }
+
+      // leadsById and the ingested set are derived views of `leads` and would
+      // otherwise point at the records the upsert just replaced.
+      if (records.leads?.length) {
+        const leads = next.leads as Lead[]
+        const byId: Record<string, Lead> = {}
+        for (const lead of leads) byId[lead.id] = lead
+        next.leadsById = byId
+        next.ingestedLeadIds = leads.filter((l) => l.ingested).map((l) => l.id)
+      }
+
+      activitySeq += 1
+      next.importedBatchIds = [...state.importedBatchIds, meta.batchId]
+      next.activities = [
+        {
+          id: nextId('ACT', activitySeq),
+          object: 'Lead' as const,
+          recordId: meta.batchId,
+          recordName: meta.label,
+          action: 'CSV import committed',
+          detail: `${written} record(s) merged from ${meta.label}`,
+          source: 'EAI Ingestion' as const,
+          at: DEMO_NOW.toISOString(),
+        },
+        ...state.activities,
+      ]
+
+      void persistImports(next as unknown as CrmState)
+      return next as unknown as CrmState
+    }),
+
+  clearImportedData: () => {
+    void clearImports()
+    set((state) => {
+      const next = { ...state } as Record<string, unknown>
+      for (const type of IMPORTABLE_TYPES) {
+        const rows = state[type as keyof CrmState] as { importedBatchId?: string }[]
+        if (Array.isArray(rows)) next[type] = rows.filter((r) => !r.importedBatchId)
+      }
+      const leads = next.leads as Lead[]
+      const byId: Record<string, Lead> = {}
+      for (const lead of leads) byId[lead.id] = lead
+      return {
+        ...(next as unknown as CrmState),
+        leadsById: byId,
+        ingestedLeadIds: leads.filter((l) => l.ingested).map((l) => l.id),
+        importedBatchIds: [],
+      }
+    })
+  },
+
+  rehydrateImports: async () => {
+    const payload = await readImports()
+    if (!payload) return
+    const records = payload.records as Partial<Record<RecordType, { id: string }[]>>
+    if (!Object.keys(records).length) return
+    get().importRecords(records, {
+      batchId: payload.batchIds[0] ?? 'restored',
+      label: 'restored from this browser',
+    })
+  },
 
   /**
    * Opens a recovery case. Called only after a human approves the agent's
@@ -687,6 +834,15 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     activitySeq = 0
     taskSeq = 0
     recoverySeq = 0
+    /*
+     * Imports go too, on disk as well as in memory.
+     *
+     * Reset means "restore the seeded book", and if the rehearsed figures do
+     * not come back then reset is a lie. Clearing the store but not IndexedDB
+     * would resurrect the import on the next load and make reset look broken —
+     * the likeliest bug in this feature, so the two are done together.
+     */
+    void clearImports()
     // Back to variant 0 -- the book every rehearsed number refers to.
     set(seedState(source))
   },

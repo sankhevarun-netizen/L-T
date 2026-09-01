@@ -136,7 +136,32 @@ function normaliseEmail(email: string) {
  * console can show the funnel before the user commits it. The same
  * propose-then-commit shape every agent in this build follows.
  */
-export function runIngestionPipeline(batch: Lead[]): PipelineRun {
+/**
+ * Contact keys already in the book, so an upload can be deduped against it and
+ * not just against itself.
+ *
+ * Normalised on the way in by `knownKeysFrom`, which exists so callers cannot
+ * hand-roll the rule — `normalisePhone` and `normaliseEmail` are module-private
+ * precisely so there is one definition of what "the same person" means.
+ */
+export interface KnownKeys {
+  phones: ReadonlySet<string>
+  emails: ReadonlySet<string>
+}
+
+export function knownKeysFrom(leads: Lead[]): KnownKeys {
+  const phones = new Set<string>()
+  const emails = new Set<string>()
+  for (const lead of leads) {
+    const p = normalisePhone(lead.phone ?? '')
+    const e = normaliseEmail(lead.email ?? '')
+    if (p) phones.add(p)
+    if (e) emails.add(e)
+  }
+  return { phones, emails }
+}
+
+export function runIngestionPipeline(batch: Lead[], known?: KnownKeys): PipelineRun {
   const seenPhone = new Set<string>()
   const seenEmail = new Set<string>()
 
@@ -149,8 +174,17 @@ export function runIngestionPipeline(batch: Lead[]): PipelineRun {
     const phone = normalisePhone(lead.phone ?? '')
     const email = normaliseEmail(lead.email ?? '')
 
-    // De-duplication first: a duplicate is not also a validation failure.
-    if ((phone && seenPhone.has(phone)) || (email && seenEmail.has(email))) {
+    /*
+     * De-duplication first: a duplicate is not also a validation failure.
+     *
+     * `known` is tested rather than merged into the local sets, so the caller's
+     * sets are never mutated. A collision with the book takes the same path as
+     * one within the batch, which is what keeps the funnel reconciling.
+     */
+    if (
+      (phone && (seenPhone.has(phone) || known?.phones.has(phone))) ||
+      (email && (seenEmail.has(email) || known?.emails.has(email)))
+    ) {
       duplicates += 1
       continue
     }

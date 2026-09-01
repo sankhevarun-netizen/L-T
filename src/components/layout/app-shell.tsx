@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 
 import { DemoMenu } from './demo-menu'
 import { Header } from './header'
+import { ImportHydrator } from './import-hydrator'
 import { LastUpdated } from './last-updated'
 import { RestrictedScreen, useCanAccess } from './restriction'
 import { Sidebar } from './sidebar'
@@ -14,6 +15,7 @@ import { resolveNavItem } from '@/config/nav'
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <TooltipProvider delayDuration={80}>
+      <ImportHydrator />
       <div className="flex h-screen w-full overflow-hidden bg-background">
         <Sidebar />
 
