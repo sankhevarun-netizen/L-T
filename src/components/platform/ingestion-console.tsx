@@ -23,11 +23,11 @@ import {
   type IngestionSourceId,
   type PipelineRun,
 } from '@/lib/selectors/ingestion'
-import { formatNumber } from '@/lib/format'
+import { formatDate, formatNumber } from '@/lib/format'
 import { Progress } from '@/components/ui/progress'
 import { yieldToPaint } from '@/lib/async'
 import { parseCsvAsync, toObjectsAsync } from '@/lib/csv/parse-csv'
-import { planMergeAsync, type MergePlan } from '@/lib/ingestion/merge-plan'
+import { planMergeAsync, summarise, type MergePlan } from '@/lib/ingestion/merge-plan'
 import {
   detectType,
   RECORD_TYPES,
@@ -105,6 +105,7 @@ export function IngestionConsole() {
   const surveyResponses = useCrmStore((s) => s.surveyResponses)
   const recoveryCases = useCrmStore((s) => s.recoveryCases)
   const importedBatchIds = useCrmStore((s) => s.importedBatchIds)
+  const lastImportReport = useCrmStore((s) => s.lastImportReport)
   const importRecords = useCrmStore((s) => s.importRecords)
   const clearImportedData = useCrmStore((s) => s.clearImportedData)
 
@@ -322,10 +323,13 @@ export function IngestionConsole() {
       setImp({ step: 'working', label: 'Writing to the book', percent: VALIDATE_SHARE })
       await yieldToPaint()
 
+      const mode = replaceBook ? 'replace' : 'merge'
       importRecords(records, {
         batchId: `imp-${Date.now()}`,
         label,
-        mode: replaceBook ? 'replace' : 'merge',
+        mode,
+        // Kept on the store so the outcome outlives this screen.
+        report: summarise(plan, { label, mode }),
       })
       setImp({ step: 'done', plan, label })
     } catch (error) {
@@ -610,6 +614,9 @@ export function IngestionConsole() {
                       {t.reasons.length
                         ? ` — ${t.reasons.map((r) => `${r.reason} (${formatNumber(r.count)})`).join(' · ')}`
                         : ''}
+                      {t.repaired.length
+                        ? ` · ${t.repaired.map((r) => `${r.reason} (${formatNumber(r.count)})`).join(' · ')}`
+                        : ''}
                     </p>
                   ))}
                 </div>
@@ -655,6 +662,39 @@ export function IngestionConsole() {
                     Every agent found something to report in this book.
                   </p>
                 )}
+              </div>
+            )}
+
+            {imp.step !== 'done' && lastImportReport && (
+              /*
+               * The same counts, after the fact.
+               *
+               * The done-step report is rendered once and lost on the next
+               * navigation, which leaves no way to tell "this customer has no
+               * conversations" from "every conversation row was refused".
+               */
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Last import · {formatDate(lastImportReport.savedAt)} ·{' '}
+                  {lastImportReport.mode === 'replace' ? 'replaced the book' : 'merged'}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                  {lastImportReport.label}
+                </p>
+                <div className="mt-2 space-y-0.5">
+                  {lastImportReport.byType.map((t) => (
+                    <p key={t.type} className="nums text-[11.5px] text-slate-600">
+                      {SCHEMAS[t.type].label}: {formatNumber(t.accepted)} written
+                      {t.rejected > 0 ? `, ${formatNumber(t.rejected)} rejected` : ''}
+                      {t.reasons.length
+                        ? ` — ${t.reasons.map((r) => `${r.reason} (${formatNumber(r.count)})`).join(' · ')}`
+                        : ''}
+                      {t.repaired.length
+                        ? ` · ${t.repaired.map((r) => `${r.reason} (${formatNumber(r.count)})`).join(' · ')}`
+                        : ''}
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
 

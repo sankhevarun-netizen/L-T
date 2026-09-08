@@ -27,6 +27,12 @@ export interface TypePlan {
   accepted: { id: string }[]
   rejected: number
   reasons: { reason: string; count: number }[]
+  /**
+   * Rows accepted only after a foreign key was normalised — counted apart from
+   * `reasons`, which is about refusals. Repairing a client's punctuation is
+   * reasonable; doing it without saying so is not.
+   */
+  repaired: { reason: string; count: number }[]
   /** Rows whose id already exists, and which will therefore replace it. */
   replacing: number
 }
@@ -57,13 +63,103 @@ export interface PlanProgress {
   rowsTotal: number
 }
 
+/**
+ * The plan, minus the records themselves.
+ *
+ * Kept so the outcome of an import survives navigation and a reload. The plan
+ * holds every accepted row, which is the whole book — this is the same counts
+ * without the payload, and it is what gets written to IndexedDB.
+ */
+export type TypeReport = Omit<TypePlan, 'accepted'> & { accepted: number }
+
+export interface ImportReport {
+  savedAt: string
+  label: string
+  mode: 'merge' | 'replace'
+  byType: TypeReport[]
+  totalReceived: number
+  totalAccepted: number
+  totalRejected: number
+}
+
+export function summarise(
+  plan: MergePlan,
+  meta: { label: string; mode: 'merge' | 'replace' },
+): ImportReport {
+  return {
+    savedAt: new Date().toISOString(),
+    label: meta.label,
+    mode: meta.mode,
+    byType: plan.byType.map(({ accepted, ...rest }) => ({
+      ...rest,
+      accepted: accepted.length,
+    })),
+    totalReceived: plan.totalReceived,
+    totalAccepted: plan.totalAccepted,
+    totalRejected: plan.totalRejected,
+  }
+}
+
 type Coerced = { id: string } & Record<string, unknown>
+
+/**
+ * Ids a foreign key can resolve against, in two forms.
+ *
+ * `exact` is the truth and is tried first. `canonical` exists because a client
+ * export routinely spells the same id differently in two files — PRL-100967 in
+ * the leads sheet, PRL100967 in the engagements one — and refusing fifteen
+ * thousand rows over punctuation is not integrity, it is a formatting
+ * complaint. `ambiguous` holds canonical keys that more than one real id
+ * collapses to; those never match, because a wrong join is worse than a
+ * rejection and far harder to notice afterwards.
+ */
+interface IdIndex {
+  exact: Set<string>
+  canonical: Map<string, string>
+  ambiguous: Set<string>
+}
+
+const canon = (id: string) => id.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+
+function newIndex(ids?: Iterable<string>): IdIndex {
+  const index: IdIndex = {
+    exact: new Set(),
+    canonical: new Map(),
+    ambiguous: new Set(),
+  }
+  if (ids) for (const id of ids) addId(index, id)
+  return index
+}
+
+function addId(index: IdIndex, id: string): void {
+  index.exact.add(id)
+  const key = canon(id)
+  // An id of pure punctuation canonicalises to nothing, which would collide
+  // with every other such id.
+  if (!key) return
+  const held = index.canonical.get(key)
+  if (held === undefined) index.canonical.set(key, id)
+  else if (held !== id) index.ambiguous.add(key)
+}
+
+/** The real id this value refers to, or null if nothing does. */
+function resolveId(
+  index: IdIndex,
+  value: string,
+): { id: string; exact: boolean } | null {
+  if (index.exact.has(value)) return { id: value, exact: true }
+  const key = canon(value)
+  if (!key || index.ambiguous.has(key)) return null
+  const match = index.canonical.get(key)
+  return match === undefined ? null : { id: match, exact: false }
+}
 
 /** What one record type accumulates as its rows are judged. */
 interface TypeAcc {
   received: number
   accepted: Coerced[]
   reasons: Map<string, number>
+  repairs: Map<string, number>
   /** Ids already met in this file — a repeat is the later row winning. */
   seenInFile: Set<string>
   replacing: number
@@ -73,6 +169,7 @@ const newAcc = (): TypeAcc => ({
   received: 0,
   accepted: [],
   reasons: new Map(),
+  repairs: new Map(),
   seenInFile: new Set(),
   replacing: 0,
 })
@@ -87,7 +184,7 @@ const newAcc = (): TypeAcc => ({
 function admit(
   record: Coerced,
   schema: RecordSchema,
-  resolvable: Partial<Record<RecordType, Set<string>>>,
+  resolvable: Partial<Record<RecordType, IdIndex>>,
   existingForType: ReadonlySet<string>,
   acc: TypeAcc,
 ): void {
@@ -95,6 +192,8 @@ function admit(
 
   const note = (reason: string) =>
     acc.reasons.set(reason, (acc.reasons.get(reason) ?? 0) + 1)
+  const noteRepair = (reason: string) =>
+    acc.repairs.set(reason, (acc.repairs.get(reason) ?? 0) + 1)
 
   if (!record.id) {
     note('Missing id')
@@ -107,9 +206,25 @@ function admit(
       note(`Missing ${ref.field}`)
       return
     }
-    if (!resolvable[ref.to]?.has(value)) {
+
+    const target = resolvable[ref.to]
+    const hit = target ? resolveId(target, value) : null
+    if (!hit) {
       note(`${ref.field} matches no ${SCHEMAS[ref.to].label.toLowerCase()} record`)
       return
+    }
+
+    if (!hit.exact) {
+      /*
+       * Write the real id back onto the record.
+       *
+       * Every join downstream — the Customer 360 timeline, the agent context,
+       * the feedback selectors — is a plain `===` against the lead's own id. A
+       * match resolved here but not written back would fix the import report
+       * and leave every screen exactly as empty as it was.
+       */
+      record[ref.field] = hit.id
+      noteRepair(`${ref.field} matched after normalising`)
     }
   }
 
@@ -124,29 +239,33 @@ function admit(
 function closeType(
   type: RecordType,
   acc: TypeAcc,
-  resolvable: Partial<Record<RecordType, Set<string>>>,
+  resolvable: Partial<Record<RecordType, IdIndex>>,
 ): TypePlan {
-  const pool = resolvable[type] ?? new Set<string>()
-  for (const r of acc.accepted) pool.add(r.id)
+  const pool = resolvable[type] ?? newIndex()
+  for (const r of acc.accepted) addId(pool, r.id)
   resolvable[type] = pool
+
+  const tally = (counts: Map<string, number>) =>
+    [...counts.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
 
   return {
     type,
     received: acc.received,
     accepted: acc.accepted,
     rejected: acc.received - acc.accepted.length,
-    reasons: [...acc.reasons.entries()]
-      .map(([reason, count]) => ({ reason, count }))
-      .sort((a, b) => b.count - a.count),
+    reasons: tally(acc.reasons),
+    repaired: tally(acc.repairs),
     replacing: acc.replacing,
   }
 }
 
 /** Ids that will exist once earlier types in this same import are merged. */
 function seedResolvable(existing: ExistingIds) {
-  const resolvable: Partial<Record<RecordType, Set<string>>> = {}
+  const resolvable: Partial<Record<RecordType, IdIndex>> = {}
   for (const [type, ids] of Object.entries(existing)) {
-    resolvable[type as RecordType] = new Set(ids)
+    resolvable[type as RecordType] = newIndex(ids)
   }
   return resolvable
 }
@@ -172,7 +291,7 @@ export function planMerge(
     const { records } = coerceRows<Coerced>(type, rows)
     const schema = SCHEMAS[type]
     const acc = newAcc()
-    const existingForType = resolvable[type] ?? new Set<string>()
+    const existingForType = resolvable[type]?.exact ?? new Set<string>()
 
     for (const record of records) {
       admit(record, schema, resolvable, existingForType, acc)
@@ -211,7 +330,7 @@ export async function planMergeAsync(
     const rows = grouped[type] ?? []
     const schema = SCHEMAS[type]
     const acc = newAcc()
-    const existingForType = resolvable[type] ?? new Set<string>()
+    const existingForType = resolvable[type]?.exact ?? new Set<string>()
 
     for (const row of rows) {
       if (slicer.expired()) {

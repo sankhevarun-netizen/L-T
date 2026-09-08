@@ -23,6 +23,7 @@ import type {
   Transcript,
 } from '@/types'
 import { TOUCHPOINT_LABEL } from '@/types'
+import type { ImportReport } from '@/lib/ingestion/merge-plan'
 import type { RecordType } from '@/lib/ingestion/schemas'
 import {
   isReferenceType,
@@ -84,6 +85,7 @@ function persistImports(state: CrmState, mode: 'merge' | 'replace') {
     savedAt: new Date().toISOString(),
     mode,
     records,
+    report: state.lastImportReport ?? undefined,
     reference: {
       projects: current.projects,
       reps: current.reps,
@@ -157,8 +159,16 @@ export interface CrmState {
   /** Merge parsed CSV records into the book, upserting on id. */
   importRecords: (
     records: Partial<Record<RecordType, { id: string }[]>>,
-    meta: { batchId: string; label: string; mode?: 'merge' | 'replace' },
+    meta: {
+      batchId: string
+      label: string
+      mode?: 'merge' | 'replace'
+      /** Counts to keep, so the outcome survives navigation and a reload. */
+      report?: ImportReport
+    },
   ) => void
+  /** What the last import accepted and refused; null until one has run. */
+  lastImportReport: ImportReport | null
   /** Drop everything a CSV import brought in, in memory and on disk. */
   clearImportedData: () => void
   /** Restore a previous import after a reload. Effect-only — never in render. */
@@ -302,6 +312,7 @@ function seedState(source: 'example' | 'client' = 'example') {
     ingestedLeadIds: data.leads.filter((l) => l.ingested).map((l) => l.id),
     importedBatchIds: [] as string[],
     referenceVersion: 0,
+    lastImportReport: null,
   }
 }
 
@@ -507,6 +518,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       const stamped = { importedBatchId: meta.batchId }
       const replace = meta.mode === 'replace'
       let written = 0
+      if (meta.report) next.lastImportReport = meta.report
 
       /*
        * Replace empties every importable collection first, including the ones
@@ -633,6 +645,8 @@ export const useCrmStore = create<CrmState>((set, get) => ({
       label: 'restored from this browser',
       // Restoring a replace as a merge would hand back the replaced book.
       mode: payload.mode,
+      // The counts belong to the original import, not to this restore.
+      report: payload.report,
     })
   },
 

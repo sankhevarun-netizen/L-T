@@ -7,6 +7,7 @@ import {
   Check,
   CircleAlert,
   CircleCheck,
+  CreditCard,
   Globe,
   Gauge,
   LifeBuoy,
@@ -35,7 +36,17 @@ import { nextBestActionFor, weightedValueCr } from '@/lib/selectors/overview'
 import { useCrmStore } from '@/store/crm-store'
 import { TOUCHPOINT_LABEL } from '@/types'
 import { formatCrore, formatDate } from '@/lib/format'
-import { STAGE_ORDER, type EngagementChannel, type Sentiment } from '@/types'
+import {
+  STAGE_ORDER,
+  type Booking,
+  type Engagement,
+  type EngagementChannel,
+  type LeadEvidence,
+  type Payment,
+  type Sentiment,
+  type ServiceTicket,
+  type SiteVisit,
+} from '@/types'
 import { cn } from '@/lib/utils'
 
 const CHANNEL_ICONS: Record<EngagementChannel, LucideIcon> = {
@@ -51,6 +62,145 @@ const SENTIMENT_TONE: Record<Sentiment, string> = {
   neutral: 'bg-slate-100 text-slate-600',
   negative: 'bg-red-50 text-red-700',
 }
+
+/**
+ * One row on the consolidated timeline, whatever record produced it.
+ *
+ * `sentiment` is optional on purpose. Only an engagement carries one; a payment
+ * or a booking does not, and inventing a mood for them so every row looks alike
+ * would put a judgement on screen that no record supports.
+ */
+interface TimelineEntry {
+  id: string
+  /** ISO, for ordering. */
+  at: string
+  icon: LucideIcon
+  title: string
+  detail: string
+  /** The grey line beside the title — channel, direction, status. */
+  meta: string
+  sentiment?: Sentiment
+}
+
+/**
+ * Imported dates are whatever the file said.
+ *
+ * An unparseable one must not poison the sort — NaN compares false against
+ * everything and would scatter the rest of the list — so it sinks to the
+ * bottom instead.
+ */
+function timeOf(at: string): number {
+  const t = new Date(at).getTime()
+  return Number.isFinite(t) ? t : 0
+}
+
+/**
+ * Every interaction this customer has, from every record type.
+ *
+ * The tab used to read `engagements` alone. On an imported book whose
+ * conversation history is thin that showed "Engagements (0)" next to a journey
+ * strip carrying a real site-visit date — the records had joined and simply
+ * were not being rendered. The page's own subtitle promises a consolidated view
+ * across every channel; this is that view.
+ *
+ * Nothing here is generated. Every row is a record the loaded book supplied.
+ */
+function buildTimeline(input: {
+  engagements: Engagement[]
+  visits: SiteVisit[]
+  booking?: Booking
+  payments: Payment[]
+  tickets: ServiceTicket[]
+}): TimelineEntry[] {
+  const out: TimelineEntry[] = []
+
+  for (const e of input.engagements) {
+    out.push({
+      id: e.id,
+      at: e.occurredAt,
+      icon: CHANNEL_ICONS[e.channel] ?? MessageCircle,
+      title: e.subject,
+      detail: e.summary,
+      meta: `${e.channel.replace('-', ' ')} · ${e.direction}${
+        e.durationMins ? ` · ${e.durationMins} min` : ''
+      }`,
+      sentiment: e.sentiment,
+    })
+  }
+
+  for (const v of input.visits) {
+    // A booked slot nobody turned up to is as much a fact about the customer
+    // as one they attended, so both are shown and labelled.
+    const meta = ['site visit', v.attended ? 'attended' : 'no-show']
+    if (v.outcome) meta.push(v.outcome)
+
+    out.push({
+      id: v.id,
+      at: v.scheduledAt,
+      icon: MapPin,
+      title: `Site visit — ${v.projectName}`,
+      detail:
+        v.feedback ??
+        (v.objection
+          ? `Objection raised: ${v.objection}.`
+          : 'Visit recorded against the project.'),
+      meta: meta.join(' · '),
+    })
+  }
+
+  if (input.booking) {
+    const b = input.booking
+    out.push({
+      id: b.id,
+      at: b.bookedAt,
+      icon: Building2,
+      title: `Booked ${b.unitType} — ${b.projectName}`,
+      detail: `Booking value ${formatCrore(b.valueCr, { decimals: 2 })}.`,
+      meta: b.closedWon ? 'booking · closed won' : 'booking',
+    })
+  }
+
+  for (const p of input.payments) {
+    // An overdue milestone is a customer event, not just a finance row — it is
+    // often the reason the next conversation goes the way it does.
+    out.push({
+      id: p.id,
+      at: p.paidAt ?? p.dueAt,
+      icon: CreditCard,
+      title: p.milestone,
+      detail: p.paidAt
+        ? `${formatCrore(p.amountCr, { decimals: 2 })} received.`
+        : `${formatCrore(p.amountCr, { decimals: 2 })} ${p.status}.`,
+      meta: `payment · ${p.status}`,
+    })
+  }
+
+  for (const t of input.tickets) {
+    out.push({
+      id: t.id,
+      at: t.openedAt,
+      icon: LifeBuoy,
+      title: t.subject,
+      detail: t.detail,
+      meta: `service · ${t.category} · ${t.severity} · ${t.status.replace('-', ' ')}`,
+    })
+  }
+
+  // Newest first — the order the engagement list already used.
+  return out.sort((a, b) => timeOf(b.at) - timeOf(a.at))
+}
+
+/** The behavioural counters, for a record that carries counts and no detail. */
+const EVIDENCE_LABELS: { key: keyof LeadEvidence; label: string }[] = [
+  { key: 'callsAnswered', label: 'Calls answered' },
+  { key: 'callsAttempted', label: 'Calls attempted' },
+  { key: 'whatsappReplies', label: 'WhatsApp replies' },
+  { key: 'emailOpens', label: 'Emails opened' },
+  { key: 'websiteVisits', label: 'Website visits' },
+  { key: 'brochureViews', label: 'Brochure views' },
+  { key: 'projectsViewed', label: 'Projects viewed' },
+  { key: 'siteVisitsAttended', label: 'Site visits attended' },
+]
 
 const MILESTONES = [
   { label: 'Lead', stage: 'lead' },
@@ -69,6 +219,7 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
   const allVisits = useCrmStore((s) => s.siteVisits)
   const allBookings = useCrmStore((s) => s.bookings)
   const allTickets = useCrmStore((s) => s.serviceTickets)
+  const allPayments = useCrmStore((s) => s.payments)
   const allTasks = useCrmStore((s) => s.tasks)
   const customers = useCrmStore((s) => s.customers)
   const assignment = usePersonaFor(leadId)
@@ -97,6 +248,15 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
   const tickets = allTickets.filter((t) => t.leadId === leadId)
   const tasks = allTasks.filter((t) => t.whatId === leadId && t.status === 'Open')
   const customer = customers.find((c) => c.id === leadId)
+  const payments = allPayments.filter((p) => p.leadId === leadId)
+
+  const timeline = buildTimeline({
+    engagements,
+    visits,
+    booking,
+    payments,
+    tickets,
+  })
 
   // "Engaged" means an actual two-way conversation started — not the web form
   // that created the record, which would just repeat the Lead date.
@@ -275,7 +435,7 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
       <Tabs defaultValue="engagements">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="engagements">
-            Engagements ({engagements.length})
+            Engagements ({timeline.length})
           </TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="insights">AI Insights</TabsTrigger>
@@ -285,28 +445,50 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
         {/* Engagements */}
         <TabsContent value="engagements">
           <Card className="p-5">
-            {engagements.length === 0 ? (
-              <div className="py-10 text-center">
-                <p className="text-[13px] font-semibold text-slate-600">
-                  No interaction history ingested yet
+            {timeline.length === 0 ? (
+              /*
+               * Reachable only for a lead with no records of any kind. Show the
+               * counters the record does carry rather than an empty panel: they
+               * are real imported values, and they are the difference between
+               * "nothing here" and "here is what we hold on this customer".
+               */
+              <div className="py-8">
+                <p className="text-center text-[13px] font-semibold text-slate-600">
+                  No interaction records for this customer
                 </p>
-                <p className="mx-auto mt-1 max-w-md text-[12px] leading-relaxed text-slate-400">
+                <p className="mx-auto mt-1 max-w-md text-center text-[12px] leading-relaxed text-slate-400">
                   This record has not been through EAI sanitisation, so DICE has
                   behavioural counts but no conversation detail to reason over.
+                </p>
+
+                <div className="mx-auto mt-5 grid max-w-2xl grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">
+                  {EVIDENCE_LABELS.map(({ key, label }) => (
+                    <div key={key} className="bg-white px-3 py-2.5 text-center">
+                      <p className="nums text-[15px] font-bold text-slate-900">
+                        {lead.evidence[key]}
+                      </p>
+                      <p className="mt-0.5 text-[10.5px] leading-tight text-slate-500">
+                        {label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-center text-[11px] text-slate-400">
+                  Counts only · last activity {lead.evidence.daysSinceLastActivity} days ago
                 </p>
               </div>
             ) : (
               <ol className="space-y-0">
-                {engagements.map((e, i) => {
-                  const Icon = CHANNEL_ICONS[e.channel]
+                {timeline.map((entry, i) => {
+                  const Icon = entry.icon
                   return (
-                    <li key={e.id} className="flex gap-3.5">
+                    <li key={entry.id} className="flex gap-3.5">
                       {/* Rail */}
                       <div className="flex flex-col items-center">
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
                           <Icon className="size-4" strokeWidth={2} />
                         </span>
-                        {i < engagements.length - 1 && (
+                        {i < timeline.length - 1 && (
                           <span className="w-px flex-1 bg-slate-200" />
                         )}
                       </div>
@@ -314,26 +496,27 @@ export function CustomerProfile({ leadId }: { leadId: string }) {
                       <div className="min-w-0 flex-1 pb-5">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-[13px] font-semibold text-slate-900">
-                            {e.subject}
+                            {entry.title}
                           </p>
-                          <span
-                            className={cn(
-                              'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
-                              SENTIMENT_TONE[e.sentiment],
-                            )}
-                          >
-                            {e.sentiment}
-                          </span>
+                          {entry.sentiment ? (
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize',
+                                SENTIMENT_TONE[entry.sentiment],
+                              )}
+                            >
+                              {entry.sentiment}
+                            </span>
+                          ) : null}
                           <span className="text-[11px] capitalize text-slate-400">
-                            {e.channel.replace('-', ' ')} · {e.direction}
-                            {e.durationMins ? ` · ${e.durationMins} min` : ''}
+                            {entry.meta}
                           </span>
                           <span className="ml-auto shrink-0 text-[11px] text-slate-400">
-                            {formatDate(e.occurredAt)}
+                            {formatDate(entry.at)}
                           </span>
                         </div>
                         <p className="mt-1 text-[12.5px] leading-relaxed text-slate-600">
-                          {e.summary}
+                          {entry.detail}
                         </p>
                       </div>
                     </li>

@@ -1,3 +1,4 @@
+import type { ImportReport } from './merge-plan'
 import type { RecordType } from './schemas'
 
 /**
@@ -41,6 +42,14 @@ export interface ImportPayload {
    * client's book under the previous client's labels.
    */
   reference?: Record<string, unknown[]>
+  /**
+   * What the last import accepted and refused.
+   *
+   * Persisted because the on-screen report is rendered once and lost on the
+   * next navigation, which leaves no way to tell "this customer has no
+   * conversations" from "every conversation row was rejected".
+   */
+  report?: ImportReport
 }
 
 function openDb(): Promise<IDBDatabase | null> {
@@ -157,5 +166,11 @@ function validate(value: unknown): ImportPayload | null {
     records,
     reference:
       p.reference && typeof p.reference === 'object' ? p.reference : undefined,
+    // Shape-checked no further than this: it is display-only, and a malformed
+    // report must not cost the user the records it describes.
+    report:
+      p.report && typeof p.report === 'object' && Array.isArray(p.report.byType)
+        ? p.report
+        : undefined,
   }
 }
