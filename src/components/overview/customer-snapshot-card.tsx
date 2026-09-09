@@ -143,7 +143,7 @@ export function CustomerSnapshotCard({ leadId }: { leadId?: string } = {}) {
   return (
     <Card className="flex flex-col">
       <CardHeader>
-        <CardTitle>Customer 360 Snapshot</CardTitle>
+        <CardTitle>Customer Journey Orchestration Copilot</CardTitle>
         <CardLink
           href={`/customers/${lead.id}`}
           label="View Full Profile"

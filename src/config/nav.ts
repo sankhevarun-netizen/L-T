@@ -87,7 +87,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Leads',
         href: '/leads',
         icon: UsersRound,
-        title: 'Leads',
+        title: 'Lead Quality & Conversion Engine',
         subtitle: 'Every lead, scored and validated against real evidence.',
       },
       {
@@ -171,7 +171,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'CSAT & NPS',
         href: '/csat-nps',
         icon: Gauge,
-        title: 'CSAT & NPS Reporting',
+        title: 'CSAT & NPS Intelligence',
         subtitle:
           'From descriptive scores to governed feedback intelligence — nine capabilities across two types.',
       },
@@ -179,7 +179,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: 'Persona Mapping',
         href: '/persona-mapping',
         icon: Layers,
-        title: 'Persona Mapping',
+        title: 'Dynamic Persona & Property-fit Engine',
         subtitle:
           'Every lead scored against six buyer personas — with the evidence behind each assignment.',
       },
@@ -260,7 +260,7 @@ export const EXTRA_ROUTES: NavItem[] = [
     label: 'Customer 360',
     href: '/customers',
     icon: UsersRound,
-    title: 'Customer 360',
+    title: 'Customer Journey Orchestration Copilot',
     subtitle: 'One consolidated view of the customer, across every channel.',
   },
 ]

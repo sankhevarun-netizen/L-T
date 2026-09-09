@@ -46,7 +46,7 @@ export function PersonaBoard() {
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-rail-800 p-5 text-white shadow-card">
         <div className="min-w-0">
           <h2 className="text-[19px] font-bold tracking-[-0.01em]">
-            AI Persona Mapping
+            Dynamic Persona & Property-fit Engine
           </h2>
           <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-white/60">
             Every open lead scored against {personas.length} buyer personas from

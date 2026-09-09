@@ -71,7 +71,7 @@ export function CustomerIntelligenceHub() {
 
     return [
       {
-        name: 'Leads',
+        name: 'Lead Quality & Conversion Engine',
         href: '/leads',
         icon: UsersRound,
         blurb:
@@ -81,7 +81,7 @@ export function CustomerIntelligenceHub() {
         chip: `${formatNumber(hot)} high intent`,
       },
       {
-        name: 'Customer 360 Snapshot',
+        name: 'Customer Journey Orchestration Copilot',
         href: '/customers',
         icon: UserSearch,
         blurb:
@@ -91,7 +91,7 @@ export function CustomerIntelligenceHub() {
         chip: 'five record types',
       },
       {
-        name: 'Persona Mapping',
+        name: 'Dynamic Persona & Property-fit Engine',
         href: '/persona-mapping',
         icon: Layers,
         blurb:
@@ -106,7 +106,7 @@ export function CustomerIntelligenceHub() {
         chip: 'six personas',
       },
       {
-        name: 'CSAT & NPS',
+        name: 'CSAT & NPS Intelligence',
         href: '/csat-nps',
         icon: Gauge,
         blurb:
