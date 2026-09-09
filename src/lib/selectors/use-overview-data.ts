@@ -121,18 +121,30 @@ export function selectHeroLead(
   return best ?? leads[0]
 }
 
-export function useHeroLead() {
+/**
+ * The lead the snapshot renders.
+ *
+ * `leadId` names one; without it the ranked pick stands. The Overview passes
+ * nothing and is unaffected — the directory names a customer, and the same card
+ * serves both rather than being forked into a near-copy.
+ *
+ * An id that resolves to nothing falls back to the ranked pick rather than
+ * blanking the card, which is what a stale link or a replaced book produces.
+ */
+export function useHeroLead(leadId?: string) {
+  const leadsById = useCrmStore((s) => s.leadsById)
   const leads = useCrmStore((s) => s.leads)
   const engagements = useCrmStore((s) => s.engagements)
   const siteVisits = useCrmStore((s) => s.siteVisits)
 
   return useMemo(() => {
-    const lead = selectHeroLead(leads, siteVisits)
+    const named = leadId ? leadsById[leadId] : undefined
+    const lead = named ?? selectHeroLead(leads, siteVisits)
     if (!lead) return null
     return {
       lead,
       engagements: engagements.filter((e) => e.leadId === lead.id),
       siteVisits: siteVisits.filter((v) => v.leadId === lead.id),
     }
-  }, [leads, engagements, siteVisits])
+  }, [leadId, leadsById, leads, engagements, siteVisits])
 }

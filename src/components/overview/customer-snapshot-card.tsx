@@ -116,8 +116,8 @@ function JourneyTimeline({ steps }: { steps: JourneyStep[] }) {
   )
 }
 
-export function CustomerSnapshotCard() {
-  const hero = useHeroLead()
+export function CustomerSnapshotCard({ leadId }: { leadId?: string } = {}) {
+  const hero = useHeroLead(leadId)
   if (!hero) return null
 
   const { lead, engagements, siteVisits } = hero
