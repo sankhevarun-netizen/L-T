@@ -33,6 +33,15 @@ export interface NavItem {
   title: string
   /** Header subtitle when this route is active. */
   subtitle: string
+  /**
+   * Routes this entry stands in for — reached from it, with no rail entry of
+   * their own.
+   *
+   * Only ever EXTRA_ROUTES destinations. Naming a route that has its own entry
+   * would light two at once, which is worse than the nothing-is-lit state this
+   * exists to fix.
+   */
+  owns?: string[]
 }
 
 export interface NavGroup {
@@ -138,6 +147,10 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Customer Intelligence',
         subtitle:
           'Who the customer is, what kind of buyer they are, and how they feel.',
+        // Three of its four tiles have no rail entry, so it stays lit for them.
+        // `/leads` is the fourth and is deliberately absent: it keeps its own
+        // entry under Customer Journey, and owning it would light both.
+        owns: ['/customers', '/persona-mapping', '/csat-nps'],
       },
       {
         label: 'Live Transcript',
@@ -166,22 +179,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: MessagesSquare,
         title: 'Service Assistant',
         subtitle: 'Summarise tickets, assess SLA risk, recommend resolution.',
-      },
-      {
-        label: 'CSAT & NPS',
-        href: '/csat-nps',
-        icon: Gauge,
-        title: 'CSAT & NPS Intelligence',
-        subtitle:
-          'From descriptive scores to governed feedback intelligence — nine capabilities across two types.',
-      },
-      {
-        label: 'Persona Mapping',
-        href: '/persona-mapping',
-        icon: Layers,
-        title: 'Dynamic Persona & Property-fit Engine',
-        subtitle:
-          'Every lead scored against six buyer personas — with the evidence behind each assignment.',
       },
       {
         label: 'Agent Chain',
@@ -257,6 +254,22 @@ export const PINNED_NAV: NavItem = {
  */
 export const EXTRA_ROUTES: NavItem[] = [
   {
+    label: 'CSAT & NPS',
+    href: '/csat-nps',
+    icon: Gauge,
+    title: 'CSAT & NPS Intelligence',
+    subtitle:
+      'From descriptive scores to governed feedback intelligence — nine capabilities across two types.',
+  },
+  {
+    label: 'Persona Mapping',
+    href: '/persona-mapping',
+    icon: Layers,
+    title: 'Dynamic Persona & Property-fit Engine',
+    subtitle:
+      'Every lead scored against six buyer personas — with the evidence behind each assignment.',
+  },
+  {
     label: 'Customer 360',
     href: '/customers',
     icon: UsersRound,
@@ -281,6 +294,18 @@ export function resolveNavItem(pathname: string): NavItem {
   ).sort((a, b) => b.href.length - a.href.length)[0]
 
   return prefixed ?? ALL_ITEMS[0]
+}
+
+/**
+ * Active for its own route, or for one it stands in for.
+ *
+ * Separate from `isNavItemActive` rather than folded into it: the header
+ * resolver and the pinned link both depend on the plain href test, and a route
+ * two entries can claim is exactly the bug this must not introduce.
+ */
+export function isNavEntryActive(item: NavItem, pathname: string) {
+  if (isNavItemActive(item.href, pathname)) return true
+  return item.owns?.some((href) => isNavItemActive(href, pathname)) ?? false
 }
 
 export function isNavItemActive(href: string, pathname: string) {

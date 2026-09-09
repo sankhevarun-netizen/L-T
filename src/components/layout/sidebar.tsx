@@ -8,6 +8,7 @@ import { ChevronsLeft, Lock } from 'lucide-react'
 import { KpmgLogo } from './kpmg-logo'
 import {
   NAV_GROUPS,
+  isNavEntryActive,
   PINNED_NAV,
   isNavItemActive,
   type NavItem,
@@ -159,7 +160,7 @@ export function Sidebar() {
                 <NavLink
                   key={item.href}
                   item={item}
-                  active={isNavItemActive(item.href, pathname)}
+                  active={isNavEntryActive(item, pathname)}
                   collapsed={collapsed}
                 />
               ))}
