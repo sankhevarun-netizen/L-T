@@ -54,14 +54,6 @@ export const NAV_GROUPS: NavGroup[] = [
         subtitle: 'AI-Powered Customer Intelligence Platform.',
       },
       {
-        label: 'Customer Intelligence',
-        href: '/customer-intelligence',
-        icon: UserSearch,
-        title: 'Customer Intelligence',
-        subtitle:
-          'Who the customer is, what kind of buyer they are, and how they feel.',
-      },
-      {
         label: 'How it Works',
         href: '/platform',
         icon: Workflow,
@@ -139,6 +131,14 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'copilots',
     label: 'AI Copilots',
     items: [
+      {
+        label: 'Customer Intelligence',
+        href: '/customer-intelligence',
+        icon: UserSearch,
+        title: 'Customer Intelligence',
+        subtitle:
+          'Who the customer is, what kind of buyer they are, and how they feel.',
+      },
       {
         label: 'Live Transcript',
         href: '/live-transcript',
