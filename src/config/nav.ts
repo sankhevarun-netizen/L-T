@@ -54,6 +54,14 @@ export const NAV_GROUPS: NavGroup[] = [
         subtitle: 'AI-Powered Customer Intelligence Platform.',
       },
       {
+        label: 'Customer Intelligence',
+        href: '/customer-intelligence',
+        icon: UserSearch,
+        title: 'Customer Intelligence',
+        subtitle:
+          'Who the customer is, what kind of buyer they are, and how they feel.',
+      },
+      {
         label: 'How it Works',
         href: '/platform',
         icon: Workflow,
@@ -79,18 +87,9 @@ export const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
-  /*
-   * Who the customer is, before what they did.
-   *
-   * These four were scattered: Leads sat among the transactional record tables
-   * it has nothing in common with, Persona Mapping and CSAT & NPS sat among
-   * agents that act when they are surfaces you read, and Customer 360 was not
-   * in the rail at all. Grouped, each section has one job — understand the
-   * customer, follow the journey, let agents act, manage the business.
-   */
   {
-    id: 'customer-intelligence',
-    label: 'Customer Intelligence',
+    id: 'journey',
+    label: 'Customer Journey',
     items: [
       {
         label: 'Leads',
@@ -99,35 +98,6 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Leads',
         subtitle: 'Every lead, scored and validated against real evidence.',
       },
-      {
-        label: 'Customer 360',
-        href: '/customers',
-        icon: UserSearch,
-        title: 'Customer 360',
-        subtitle: 'One consolidated view of the customer, across every channel.',
-      },
-      {
-        label: 'Persona Mapping',
-        href: '/persona-mapping',
-        icon: Layers,
-        title: 'Persona Mapping',
-        subtitle:
-          'Every lead scored against six buyer personas — with the evidence behind each assignment.',
-      },
-      {
-        label: 'CSAT & NPS',
-        href: '/csat-nps',
-        icon: Gauge,
-        title: 'CSAT & NPS Reporting',
-        subtitle:
-          'From descriptive scores to governed feedback intelligence — nine capabilities across two types.',
-      },
-    ],
-  },
-  {
-    id: 'journey',
-    label: 'Customer Journey',
-    items: [
       {
         label: 'Engagements',
         href: '/engagements',
@@ -196,6 +166,22 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: MessagesSquare,
         title: 'Service Assistant',
         subtitle: 'Summarise tickets, assess SLA risk, recommend resolution.',
+      },
+      {
+        label: 'CSAT & NPS',
+        href: '/csat-nps',
+        icon: Gauge,
+        title: 'CSAT & NPS Reporting',
+        subtitle:
+          'From descriptive scores to governed feedback intelligence — nine capabilities across two types.',
+      },
+      {
+        label: 'Persona Mapping',
+        href: '/persona-mapping',
+        icon: Layers,
+        title: 'Persona Mapping',
+        subtitle:
+          'Every lead scored against six buyer personas — with the evidence behind each assignment.',
       },
       {
         label: 'Agent Chain',
@@ -268,13 +254,16 @@ export const PINNED_NAV: NavItem = {
 /**
  * Routes that resolve a header title but never appear in the rail — reached by
  * drilling in from a card rather than by navigating.
- *
- * Empty at present. Customer 360 lived here while `/customers` was a header
- * entry with no page behind it; now that the page exists it belongs in the
- * rail, and `/customers/<id>` still resolves through it by the prefix rule.
- * The mechanism stays because the next drill-in-only route will want it.
  */
-export const EXTRA_ROUTES: NavItem[] = []
+export const EXTRA_ROUTES: NavItem[] = [
+  {
+    label: 'Customer 360',
+    href: '/customers',
+    icon: UsersRound,
+    title: 'Customer 360',
+    subtitle: 'One consolidated view of the customer, across every channel.',
+  },
+]
 
 const ALL_ITEMS: NavItem[] = [
   ...NAV_GROUPS.flatMap((group) => group.items),
