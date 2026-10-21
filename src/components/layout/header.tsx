@@ -38,6 +38,7 @@ export function Header() {
 
   const activeRole = useActiveRole()
   const setActiveRole = useUIStore((s) => s.setActiveRole)
+  const signOut = useUIStore((s) => s.signOut)
 
   const canSeeStack = useCanAccess('/tech-stack')
   const stackHint = useRestrictionHint('/tech-stack', 'Tech Stack')
@@ -193,7 +194,7 @@ export function Header() {
           })}
           <DropdownMenuSeparator />
           <DropdownMenuItem>Notification settings</DropdownMenuItem>
-          <DropdownMenuItem>Sign out</DropdownMenuItem>
+          <DropdownMenuItem onClick={signOut}>Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

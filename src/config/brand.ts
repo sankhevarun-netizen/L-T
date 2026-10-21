@@ -20,6 +20,12 @@ export const CURRENT_USER = {
   initials: 'AK',
 } as const
 
+/** Pre-filled so the sign-in screen is a click-through, not a credentials puzzle. */
+export const DEMO_CREDENTIALS = {
+  email: 'anand.kumar@kpmg.com',
+  password: 'kpmg-dice-demo',
+} as const
+
 /** The six value pillars rendered in the AI Command Center footer strip. */
 export const VALUE_PILLARS = [
   { id: 'intent', label: 'Understand\nCustomer Intent', icon: 'Brain' },

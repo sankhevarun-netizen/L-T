@@ -4,7 +4,7 @@ import { CircleCheck, Info, TriangleAlert, Workflow } from 'lucide-react'
 
 import { ArchitectureDiagram, PIPELINE_NOTE } from './architecture-diagram'
 import { ArchitectureTiles } from './architecture-tiles'
-import { SPAR_NOTE, SparFramework } from './spar-framework'
+import { SparFramework } from './spar-framework'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AGENTS, ARCHETYPE_META, type AgentArchetype } from '@/lib/agents'
 import { BRAND } from '@/config/brand'
@@ -259,16 +259,6 @@ export function PlatformPage() {
         </CardHeader>
         <CardContent>
           <SparFramework />
-
-          <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-kpmg-violet/20 bg-kpmg-violet/[0.04] p-3.5">
-            <Info
-              className="mt-0.5 size-4 shrink-0 text-kpmg-violet"
-              strokeWidth={2.1}
-            />
-            <p className="text-[12px] leading-relaxed text-slate-600">
-              {SPAR_NOTE}
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>

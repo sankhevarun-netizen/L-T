@@ -7,12 +7,18 @@ import { DemoMenu } from './demo-menu'
 import { Header } from './header'
 import { ImportHydrator } from './import-hydrator'
 import { LastUpdated } from './last-updated'
+import { LoginScreen } from './login-screen'
 import { RestrictedScreen, useCanAccess } from './restriction'
 import { Sidebar } from './sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { resolveNavItem } from '@/config/nav'
+import { useUIStore } from '@/store/ui-store'
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const isAuthenticated = useUIStore((s) => s.isAuthenticated)
+
+  if (!isAuthenticated) return <LoginScreen />
+
   return (
     <TooltipProvider delayDuration={80}>
       <ImportHydrator />

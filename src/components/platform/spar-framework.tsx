@@ -143,6 +143,3 @@ export function SparFramework() {
     </div>
   )
 }
-
-export const SPAR_NOTE =
-  'This one is not a target state — it runs per customer in the Survey Participation Optimizer, where every step states the evidence behind its own decision.'
